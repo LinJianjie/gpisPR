@@ -1,4 +1,7 @@
-from abc import ABC, abstractmethod
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 import numpy as np
 from sklearn.gaussian_process.kernels import Kernel
 from scipy.spatial.distance import pdist, cdist, squareform
@@ -27,10 +30,14 @@ class SKWilliamsPlusKernel(Kernel):
             K = dist1
         if eval_gradient:
             d1 = cdist(X, Y,metric='euclidean')
-            K_gradient=6*np.power(d1, 2)+6*self.R*d1
+            K_gradient=6*(d1+self.R)
             return K, K_gradient
         else:
             return K
+    def gradient(self, X, Y):
+        d1 = cdist(X, Y,metric='euclidean')
+        K_gradient=6*(d1-self.R)
+        return K_gradient
     def is_stationary(self):
         """Returns whether the kernel is stationary. """
         return False
@@ -60,10 +67,14 @@ class SKWilliamsMinusKernel(Kernel):
             K = dist1
         if eval_gradient:
             d1 = cdist(X, Y,metric='euclidean')
-            K_gradient=6*np.power(d1, 2)-6*self.R*d1
+            K_gradient=6*(d1-self.R)
             return K, K_gradient
         else:
             return K
+    def gradient(self,X,Y):
+        d1 = cdist(X, Y,metric='euclidean')
+        K_gradient=6*(d1-self.R)
+        return K_gradient
     def is_stationary(self):
         """Returns whether the kernel is stationary. """
         return False

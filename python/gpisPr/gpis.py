@@ -2,20 +2,54 @@
 #
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
-from sklearn.gaussian_process import GaussianProcessRegressor
-from skkernel import SKWilliamsMinusKernel
+from tkinter.messagebox import NO
+from pointCloud import PointCloud
 import numpy as np
+from skkernel import SKWilliamsMinusKernel
+from sklearn.gaussian_process import GaussianProcessRegressor
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+
 
 class GPIS(GaussianProcessRegressor):
-    def __init__(self,kernel=None, *, alpha=1e-10,
+    def __init__(self, kernel=None, *, alpha=1e-10,
                  optimizer="fmin_l_bfgs_b", n_restarts_optimizer=0,
                  normalize_y=False, copy_X_train=True, random_state=None):
         super(GPIS, self).__init__()
-        pass
+        self._X = None
+        self._Y = None
+        self._X_target=None
+        
+    @property
+    def X(self):
+        return self._X
+
+    @X.setter
+    def X(self, v):
+        self._X = v
+
+    @property
+    def Y(self):
+        return self._Y
+
+    @Y.setter
+    def Y(self, v):
+        self._Y = v
+
+    @property
+    def X_target(self):
+        return self._X_target
+
+    @X_target.setter
+    def X_target(self, v):
+        self._X_target = v
+
 
 if __name__ == '__main__':
-    X=np.random.rand(10,3)
-    y=np.random.rand(10,1)
-    kernel=SKWilliamsMinusKernel(3)
-    gpis=GPIS(kernel=SKWilliamsMinusKernel(3),random_state=0).fit(X,y)
-
+    X = np.random.rand(10, 3)
+    y = np.random.rand(10, 1)
+    kernel = SKWilliamsMinusKernel(3)
+    gpis = GPIS(kernel=SKWilliamsMinusKernel(3), random_state=0)
+    gpis.fit(X, y)

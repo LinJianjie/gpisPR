@@ -3,7 +3,11 @@
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
+import os
+import sys
 from tkinter.messagebox import NO
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 import numpy as np
 import open3d as o3d
 import transforms3d as t3d
@@ -14,13 +18,22 @@ class PointCloud:
     def __init__(self, filename=None):
         self._path = filename
         self._pcd = o3d.geometry.PointCloud()
+        self.normal=None
 
     def __call__(self):
         self._pcd = o3d.io.read_point_cloud(self.path)
 
     def transform(self, transinit):
         self._pcd.transform(transinit)
-
+    def estimate_normal(self,radius,max_knn):
+        self.pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.1,
+                                                                       max_nn=30))
+    @property
+    def normal(self):
+        return np.asarray(self.pcd.normals)
+    @normal.setter
+    def normal(self, value):
+        self._normal=value
     @property
     def point(self):
         return PointCloud.pca2xyz(self._pcd)
@@ -54,6 +67,7 @@ class PointCloud:
             return pcd_down, pcd_fpfh
 
     def visualize(self):
+        self._pcd.paint_uniform_color([1, 0.706, 0])
         o3d.visualization.draw_geometries([self._pcd])
 
     @staticmethod

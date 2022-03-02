@@ -4,8 +4,11 @@
 # https://opensource.org/licenses/MIT
 
 
+import os
+import sys
 
-from operator import le
+sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+
 import open3d as o3d
 import copy
 from pointCloud import PointCloud
@@ -49,8 +52,11 @@ class Registration:
         source_down_fpfh_center=PointCloud.PointCenter(source_down_fpfh)
         target_down_fpfh_center=PointCloud.PointCenter(target_down_fpfh)
         trans=target_down_fpfh_center-np.matmul(R_es,source_down_fpfh_center)
-        
+
         transform_es=Transformation()
         transform_es.rotation=R_es
         transform_es.trans=trans
         return transform_es
+    @staticmethod
+    def execute_registration_gpis():
+        pass
