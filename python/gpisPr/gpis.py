@@ -21,21 +21,21 @@ class GPIS(GaussianProcessRegressor):
         self._X = None
         self._Y = None
         self._X_target=None
-        
+
     @property
-    def X(self):
+    def X_source(self):
         return self._X
 
-    @X.setter
-    def X(self, v):
+    @X_source.setter
+    def X_source(self, v):
         self._X = v
 
     @property
-    def Y(self):
+    def Y_source_value(self):
         return self._Y
 
-    @Y.setter
-    def Y(self, v):
+    @Y_source_value.setter
+    def Y_source_value(self, v):
         self._Y = v
 
     @property

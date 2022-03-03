@@ -17,7 +17,7 @@ import numpy as np
 from utils import *
 from gpis import GPIS
 from scipy.linalg import cho_factor, cho_solve
-from liegroups.liegroups import SE3
+from liegroups import SE3
 
 class Optimization:
     def __init__(self, voxel_size, gpis:GPIS=None):
@@ -59,7 +59,7 @@ class Optimization:
     def getBetaM(self):
         return self.gpisGR.kernel_(self.gpisGR.X_train_,self.X_target_update)
     def getDeltaM(self):
-        Ty_odot=SE3.odot(self.X_target_update)
+        Ty_odot=SE3.odot(self.X_target_update) # R^(N \times 4 \times 6)
         dk_dy=self.gpisGR.kernel.gradient(self.gpisGR.X_train_,self.X_target_update)*(self.X_target_update-self.gpisGR.X_train_)
         return Ty_odot*dk_dy
     def execute(self):
