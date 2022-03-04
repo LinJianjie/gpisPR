@@ -1,7 +1,20 @@
-# Copyright (c) 2022 Jianjie Lin
-#
-# This software is released under the MIT License.
-# https://opensource.org/licenses/MIT
+# Copyright (C) 2022 Jianjie Lin
+# 
+# This file is part of python.
+# 
+# python is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+# 
+# python is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with python.  If not, see <http://www.gnu.org/licenses/>.
+
 
 import os
 import sys
@@ -94,8 +107,14 @@ class PointCloud:
     @staticmethod
     def PCDCenter(pcd):
         return pcd.get_center()
-
-
+    @staticmethod
+    def PointXYZ2homogeneous(pointsXYZ):
+        homo_points=np.ones([pointsXYZ.shape[0],4])
+        homo_points[:,:3]=pointsXYZ
+        return homo_points
+    @staticmethod
+    def Homogeneous2PointXYZ(home_points):
+        return home_points[:,:3]
 if __name__ == '__main__':
     source = PointCloud(filename="../data/bunny_1420.pcd")
     source()
