@@ -56,7 +56,7 @@ def test_optimization():
     print("y_source:",y_source.shape)
     print("target_points:",target_points.shape)
     gpis.X_source=X_source
-    gpis.Y_source_value=y_source
+    gpis.Y_source=y_source
     gpis.fit(X_source,y_source)
     #print("alpha:",gpis.Alpha.shape)
     opt = Optimization(voxel_size=0.01,gpis=gpis)
@@ -67,41 +67,31 @@ def test_optimization():
     opt.updateGaussNewtonBasedPerturabation(targe_points=target_points,l=0.1)
 
 def test_gpis():
-    source = PointCloud(filename="../data/happy.pcd")
-    source()
-    source_down = PointCloud()
-    source_down.pcd=source.voxel_down_sample(0.005)
-    print("source_down:",source_down.size)
-    source_down.estimate_normal(0.001, 30)
-    point2sdf = Point2SDF(source_down)
-    query_points, sdf=point2sdf.sample_sdf_near_surface(number_of_points=1000)
+    surface_points = PointCloud(filename="../data/happy.pcd")
+    surface_points()
+    #source_down = PointCloud()
+    #source_down.pcd=source.voxel_down_sample(0.005)
+    #source_down.estimate_normal(0.001, 30)
+    #point2sdf = Point2SDF(source_down)
+    #query_points, sdf=point2sdf.sample_sdf_near_surface(number_of_points=1000)
     #
-    outer=query_points[sdf>0,:]
-    outer_value=sdf[sdf>0]
-    #outer=query_points
-    #outer_value=sdf
-    gpisData=GPISData()
-    surface_points_outerlines_points=np.vstack([source_down.point,outer])
-    surface_value=np.zeros(source_down.size)
-    surface_points_outerlines_points_value=np.concatenate([surface_value,outer_value])
-    print("surface_points_outerlines_points: ",surface_points_outerlines_points.shape)
-    print("surface_points_outerlines_points_value: ",surface_points_outerlines_points_value.shape)
-    gpisData.surface_points=surface_points_outerlines_points
-    gpisData.surface_value=surface_points_outerlines_points_value
-    gpisData.compute_max_radius()
+    #outer=query_points[sdf>0,:]
+    #outer_value=sdf[sdf>0]
+
+    #gpisData=GPISData()
+    #surface_points_outerlines_points=np.vstack([source_down.point,outer])
+    #surface_value=np.zeros(source_down.size)
+    #surface_points_outerlines_points_value=np.concatenate([surface_value,outer_value])
+    #gpisData.surface_points=surface_points_outerlines_points
+    #gpisData.surface_value=surface_points_outerlines_points_value
+    #gpisData.compute_max_radius()
+    gpisData=GPISData(surface_points=surface_points)
+    gpisData.voxel_points(0.005)
+    gpisData()
 
     gpis = GPIS(kernel=SKWilliamsMinusKernel(gpisData.maxR), random_state=0)
-    gpis.fit(gpisData.surface_points,gpisData.surface_value)
-    ##
-    index=5
-    #print("point: ",outer[:index,:])
-    gpis.X_source=gpisData.surface_points
-    y_mean,y_std=gpis.predict(outer,return_std=True)
-    
-    #print("outer y_mean: ",np.power(y_mean-outer_value,2))
-    #print("outer std_mean: ",y_std)
-    #print("outer_value: ",outer_value)
-
+    gpis.fit(gpisData.X_source,gpisData.Y_source)
+    ##    
     target = PointCloud(filename="../data/happy.pcd")
     target()
     transinit = Transformation()
@@ -110,10 +100,10 @@ def test_gpis():
         DEG2RAD(0.0), DEG2RAD(180.0), DEG2RAD(0.0), 'sxyz')
     transinit.rotation = rot
     target.transform(transinit.Transform)
-    PointCloud.vis([source,target])
+    #PointCloud.vis([source,target])
     y_mean_1=gpis.predict(target.point,return_std=False)
     print("tar y_mean_1: ",np.sum(np.abs(y_mean_1)))
-    y_mean_2=gpis.predict(source.point,return_std=False)
+    y_mean_2=gpis.predict(surface_points.point,return_std=False)
     print("sur y_mean_2: ",np.sum(np.abs(y_mean_2)))
     #print("surface std_mean: ",y_std)
     #print("surface_value: ",surface_value[:index])

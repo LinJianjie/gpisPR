@@ -20,6 +20,7 @@ import numpy as np
 from skkernel import SKWilliamsMinusKernel
 from sklearn.gaussian_process import GaussianProcessRegressor
 from scipy.spatial.distance import pdist
+from point2SDF import Point2SDF
 import os
 import sys
 
@@ -27,15 +28,49 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 
 class GPISData:
-    def __init__(self) -> None:
-        self._surface_points=None
+    def __init__(self,surface_points) -> None:
+        self._surface_points=surface_points
+        self._surface_points_down=PointCloud()
         self._surface_value=None
         self._R=1
+        self.voxel_size=0.0001
+        self.out_lier=None
+        self.out_lier_value=None
+        self._X_source=None
+        self._Y_source=None
+        
+    @property
+    def X_source(self):
+        return self._X_source
+    @property
+    def Y_source(self):
+        return self._Y_source
+
+    def __call__(self):
+        self.create_outlier()
+        self._X_source=np.vstack([self._surface_points_down.point,self.out_lier])
+        surface_value=np.zeros(self._surface_points_down.size)
+        self._Y_source=np.concatenate([surface_value,self.out_lier_value])
+        self.compute_max_radius()
+    
+    def create_outlier(self):
+        self._surface_points_down.estimate_normal(self.voxel_size, 30)
+        point2sdf = Point2SDF(self._surface_points_down)
+        query_points, sdf=point2sdf.sample_sdf_near_surface(number_of_points=1000)
+        self.out_lier=query_points[sdf>0,:]
+        self.out_lier_value=sdf[sdf>0]
+    @property
+    def surface_points_down(self):
+        return self._surface_points_down
+    
+    def voxel_points(self,voxel_size):
+        self.voxel_size=voxel_size
+        self._surface_points_down.pcd=self.surface_points.voxel_down_sample(self.voxel_size)
     @property
     def surface_points(self):
         return self._surface_points
     @surface_points.setter
-    def surface_points(self,v):
+    def surface_points(self,v:PointCloud=None):
         self._surface_points=v
     @property
     def surface_value(self):
@@ -47,7 +82,7 @@ class GPISData:
     def maxR(self):
         return self._R
     def compute_max_radius(self):
-        radius = pdist(self._surface_points, metric="euclidean")
+        radius = pdist(self._surface_points.point, metric="euclidean")
         self._R = np.max(radius)
 
 class GPIS(GaussianProcessRegressor):
@@ -56,10 +91,14 @@ class GPIS(GaussianProcessRegressor):
                  normalize_y=False, copy_X_train=True, random_state=None):
         super(GPIS, self).__init__()
         self.custom_kernel = kernel
-        self._X = None
-        self._Y = None
+        self._X_source = None
+        self._Y_source = None
         self._X_target = None
-
+        
+    def fit(self, X, y):
+        self.X_source=X
+        self.Y_source=y
+        return super().fit(X, y)
     @property
     def Alpha(self):
         return self.alpha_
@@ -70,19 +109,19 @@ class GPIS(GaussianProcessRegressor):
 
     @property
     def X_source(self):
-        return self._X
+        return self._X_source
 
     @X_source.setter
     def X_source(self, v):
-        self._X = v
+        self._X_source = v
 
     @property
-    def Y_source_value(self):
-        return self._Y
+    def Y_source(self):
+        return self._Y_source
 
-    @Y_source_value.setter
-    def Y_source_value(self, v):
-        self._Y = v
+    @Y_source.setter
+    def Y_source(self, v):
+        self._Y_source = v
 
     @property
     def X_target(self):
@@ -91,10 +130,6 @@ class GPIS(GaussianProcessRegressor):
     @X_target.setter
     def X_target(self, v):
         self._X_target = v
-    
-    def predict_value(self, targe_points):
-        print("Alpha: ",self.Alpha.shape)
-        return self.Kernel(self.X_source,targe_points)
 
 if __name__ == '__main__':
     X = np.random.rand(10, 3)
