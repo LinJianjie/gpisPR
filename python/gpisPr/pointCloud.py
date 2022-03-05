@@ -48,6 +48,9 @@ class PointCloud:
     def normal(self, value):
         self._normal=value
     @property
+    def size(self):
+        return self.point.shape[0]
+    @property
     def point(self):
         return PointCloud.pca2xyz(self._pcd)
 
@@ -66,9 +69,11 @@ class PointCloud:
     @property
     def path(self):
         return self._path
-
-    def preprocess_point_cloud(self, voxel_size, toNumpy=False):
+    def voxel_down_sample(self,voxel_size):
         pcd_down = self._pcd.voxel_down_sample(voxel_size)
+        return pcd_down
+    def preprocess_point_cloud(self, voxel_size, toNumpy=False):
+        pcd_down = self.voxel_down_sample(voxel_size)
         pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size * 2.0,
                                                                        max_nn=30))
         pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_down,

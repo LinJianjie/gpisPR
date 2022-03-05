@@ -19,10 +19,12 @@
 from  liegroups import SE3
 from utils import *
 import transforms3d as t3d
-from gpis import GPIS
-from skkernel import SKWilliamsMinusKernel
+from gpis import GPIS,GPISData
+from skkernel import SKWilliamsMinusKernel,SKWilliamsPlusKernel
+from sklearn.gaussian_process.kernels import RBF
 from optimization import Optimization
-
+from pointCloud import PointCloud
+from point2SDF import Point2SDF
 def test_se3():
     X=Transformation()
     X.trans=np.asarray([2,3,4])
@@ -63,7 +65,61 @@ def test_optimization():
     #DeltaM=opt.getDeltaM(target_points=target_points)
     #opt.calculateTransformationPerturbation(target_points=target_points)
     opt.updateGaussNewtonBasedPerturabation(targe_points=target_points,l=0.1)
+
+def test_gpis():
+    source = PointCloud(filename="../data/happy.pcd")
+    source()
+    source_down = PointCloud()
+    source_down.pcd=source.voxel_down_sample(0.005)
+    print("source_down:",source_down.size)
+    source_down.estimate_normal(0.001, 30)
+    point2sdf = Point2SDF(source_down)
+    query_points, sdf=point2sdf.sample_sdf_near_surface(number_of_points=1000)
+    #
+    outer=query_points[sdf>0,:]
+    outer_value=sdf[sdf>0]
+    #outer=query_points
+    #outer_value=sdf
+    gpisData=GPISData()
+    surface_points_outerlines_points=np.vstack([source_down.point,outer])
+    surface_value=np.zeros(source_down.size)
+    surface_points_outerlines_points_value=np.concatenate([surface_value,outer_value])
+    print("surface_points_outerlines_points: ",surface_points_outerlines_points.shape)
+    print("surface_points_outerlines_points_value: ",surface_points_outerlines_points_value.shape)
+    gpisData.surface_points=surface_points_outerlines_points
+    gpisData.surface_value=surface_points_outerlines_points_value
+    gpisData.compute_max_radius()
+
+    gpis = GPIS(kernel=SKWilliamsMinusKernel(gpisData.maxR), random_state=0)
+    gpis.fit(gpisData.surface_points,gpisData.surface_value)
+    ##
+    index=5
+    #print("point: ",outer[:index,:])
+    gpis.X_source=gpisData.surface_points
+    y_mean,y_std=gpis.predict(outer,return_std=True)
+    
+    #print("outer y_mean: ",np.power(y_mean-outer_value,2))
+    #print("outer std_mean: ",y_std)
+    #print("outer_value: ",outer_value)
+
+    target = PointCloud(filename="../data/happy.pcd")
+    target()
+    transinit = Transformation()
+    transinit.trans = np.asarray([0.1, 0.2, 0.2])
+    rot = t3d.euler.euler2mat(
+        DEG2RAD(0.0), DEG2RAD(180.0), DEG2RAD(0.0), 'sxyz')
+    transinit.rotation = rot
+    target.transform(transinit.Transform)
+    PointCloud.vis([source,target])
+    y_mean_1=gpis.predict(target.point,return_std=False)
+    print("tar y_mean_1: ",np.sum(np.abs(y_mean_1)))
+    y_mean_2=gpis.predict(source.point,return_std=False)
+    print("sur y_mean_2: ",np.sum(np.abs(y_mean_2)))
+    #print("surface std_mean: ",y_std)
+    #print("surface_value: ",surface_value[:index])
+
 if __name__=="__main__":
     #test_se3() # checked
     #test_gpis_kernel() # checked
-    test_optimization()
+    #test_optimization()
+    test_gpis()

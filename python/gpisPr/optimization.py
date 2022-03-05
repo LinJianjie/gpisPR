@@ -44,6 +44,7 @@ class Optimization:
         self.sumofDetla = 0
         self.T_update = Transformation()
         self.obj_value=10000
+        self.l=0.01
 
     def objective(self, target_points):
         return np.mean(self.gpisGR.predict(target_points) ** 2)
@@ -54,10 +55,11 @@ class Optimization:
         transform_es = Registration.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
         # Registration.draw_registration_result(source.pcd,target.pcd,transform_es.Transform)
         return transform_es
-
+    def execute(self):
+        pass
     def step(self, target_points, T_last: Transformation = None):
         target_points_update = self.updateTarget_Point(target_points, T_last)
-        se3_epsilon = self.calculateTransformationPerturbation()
+        se3_epsilon = self.calculateTransformationPerturbation(target_points=target_points_update,l=self.l)
         T_update = self.update_transformation(se3_epsilon, T_last)
         return target_points_update, T_update 
     
@@ -90,6 +92,7 @@ class Optimization:
         N,_=target_points.shape
         BetaM = self.getBetaM(target_points)
         DeltaM = self.getDeltaM(target_points).reshape(N,-1,6)
+        print("Alpha: ",self.gpisGR.Alpha.shape)
         Alpha=self.gpisGR.Alpha.reshape(-1,1)
         betaalpha = np.sum(Alpha*BetaM,axis=0).reshape(-1,1)
         Alpha2=np.repeat(np.expand_dims(Alpha,axis=0),N,axis=0)
@@ -114,8 +117,7 @@ class Optimization:
         deltaM=np.matmul(dk,Ty_odot)
         return deltaM
 
-    def execute(self):
-        pass
+
 
 if __name__ == '__main__':
     source = PointCloud(filename="../data/happy.pcd")

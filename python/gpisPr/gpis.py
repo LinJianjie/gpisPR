@@ -28,12 +28,27 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 class GPISData:
     def __init__(self) -> None:
-        pass
-
+        self._surface_points=None
+        self._surface_value=None
+        self._R=1
+    @property
+    def surface_points(self):
+        return self._surface_points
+    @surface_points.setter
+    def surface_points(self,v):
+        self._surface_points=v
+    @property
+    def surface_value(self):
+        return self._surface_value
+    @surface_value.setter
+    def surface_value(self,v):
+        self._surface_value=v    
+    @property
+    def maxR(self):
+        return self._R
     def compute_max_radius(self):
-        radius = pdist(self.surface_points, metric="euclidean")
-        self.__R = np.max(radius)
-
+        radius = pdist(self._surface_points, metric="euclidean")
+        self._R = np.max(radius)
 
 class GPIS(GaussianProcessRegressor):
     def __init__(self, kernel=None, *, alpha=1e-10,
@@ -76,7 +91,10 @@ class GPIS(GaussianProcessRegressor):
     @X_target.setter
     def X_target(self, v):
         self._X_target = v
-
+    
+    def predict_value(self, targe_points):
+        print("Alpha: ",self.Alpha.shape)
+        return self.Kernel(self.X_source,targe_points)
 
 if __name__ == '__main__':
     X = np.random.rand(10, 3)
