@@ -75,11 +75,13 @@ class Optimization:
         JTJ, JTr = self.calculateTransformationPerturbation(targe_points)
         print("JTJ: ",JTJ.shape)
         print("JTr: ",JTr.shape)
-        JTJ_Hat = np.zeros(JTJ.shape[0], JTr.shape[1])
-        diagonalS = np.zeros(JTJ.shape[0], JTr.shape[1])
-        diagonalS.diagonal = JTJ.diagonal
+        JTJ_Hat = np.zeros_like(JTJ)
+        print("JTJ_Hat: ",JTJ_Hat.shape)
+        diagonalS = np.zeros_like(JTJ)
+        print("diagonalS: ",diagonalS.shape)
+        np.fill_diagonal(diagonalS,JTJ.diagonal())
         JTJ_Hat = JTJ + l * diagonalS
-        L_, low = cho_factor(JTJ_Hat, lower=True)
+        L_= cho_factor(JTJ_Hat, lower=True)
         se3_epsilon = cho_solve(L_, JTr)
         return se3_epsilon
 
