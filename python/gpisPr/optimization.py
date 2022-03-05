@@ -60,9 +60,21 @@ class Optimization:
         se3_epsilon = self.calculateTransformationPerturbation()
         T_update = self.update_transformation(se3_epsilon, T_last)
         return target_points_update, T_update 
+    
+    def update_transformation(self, se3_epsilon, T_last: Transformation):
+        return np.matmul(SE3.exp(se3_epsilon), T_last.Transform)
 
-    def updateGaussNewtonBasedPerturabation(self, l):
-        JTJ, JTr = self.calculateTransformationPerturbation()
+    def updateTarget_Point(self, target_points: np.ndarray = None, transform: Transformation = None):
+        if target_points.shape[1] == 4:
+            return np.matmul(transform.Transform, target_points.T)
+        else:
+            raise ValueError(
+                "the points should be represented in the way of 4\times N")
+
+    def updateGaussNewtonBasedPerturabation(self, targe_points,l=0):
+        JTJ, JTr = self.calculateTransformationPerturbation(targe_points)
+        print("JTJ: ",JTJ.shape)
+        print("JTr: ",JTr.shape)
         JTJ_Hat = np.zeros(JTJ.shape[0], JTr.shape[1])
         diagonalS = np.zeros(JTJ.shape[0], JTr.shape[1])
         diagonalS.diagonal = JTJ.diagonal
@@ -71,15 +83,6 @@ class Optimization:
         se3_epsilon = cho_solve(L_, JTr)
         return se3_epsilon
 
-    def update_transformation(self, se3_epsilon, T_last: Transformation):
-        return np.matmul(SE3.exp(se3_epsilon), T_last.Transform)
-
-    def updateTarget_Point(self, target_points: np.ndarray = None, transform: Transformation = None):
-        if target_points.shape[0] == 4:
-            return np.matmul(transform.Transform, target_points)
-        else:
-            raise ValueError(
-                "the points should be represented in the way of 4\times N")
 
     def calculateTransformationPerturbation(self,target_points):
         N,_=target_points.shape
@@ -103,7 +106,7 @@ class Optimization:
         Ty_odot=np.repeat(Ty_odot,N_source,axis=0)
         dk_dy = self.gpisGR.Kernel.gradient(self.gpisGR.X_source, target_points).T.reshape(-1,1)#*(target_points-self.gpisGR.X_source)
         target_points_copy=np.repeat(copy.deepcopy(target_points),N_source,axis=0)
-        source_points_copy=np.repeat(copy.deepcopy(self.gpisGR.X_source),N_source,axis=0)
+        source_points_copy=np.repeat(copy.deepcopy(self.gpisGR.X_source),N,axis=0)
         target_source_diff=(target_points_copy-source_points_copy).reshape(N*N_source,3)
         dk=PointCloud.PointXYZ2homogeneous(dk_dy*target_source_diff).reshape(N*N_source,1,4)
         deltaM=np.matmul(dk,Ty_odot)

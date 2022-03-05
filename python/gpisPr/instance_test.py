@@ -61,8 +61,8 @@ def test_optimization():
     #BetaM=opt.getBetaM(target_points=target_points)
     #print("BetaM:", BetaM.shape)
     #DeltaM=opt.getDeltaM(target_points=target_points)
-    opt.calculateTransformationPerturbation(target_points=target_points)
-
+    #opt.calculateTransformationPerturbation(target_points=target_points)
+    opt.updateGaussNewtonBasedPerturabation(targe_points=target_points,l=0.1)
 if __name__=="__main__":
     #test_se3() # checked
     #test_gpis_kernel() # checked
