@@ -21,6 +21,11 @@ from skkernel import SKWilliamsMinusKernel
 from sklearn.gaussian_process import GaussianProcessRegressor
 from scipy.spatial.distance import pdist
 from point2SDF import Point2SDF
+from liegroups import SE3
+import transforms3d as t3d
+from utils import *
+from scipy.linalg import cho_factor, cho_solve
+import copy
 import os
 import sys
 
@@ -28,11 +33,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 
 class GPISData:
-    def __init__(self,surface_points) -> None:
+    def __init__(self,surface_points,num_out_lier=1000) -> None:
         self._surface_points=surface_points
         self._surface_points_down=PointCloud()
         self._surface_value=None
         self._R=1
+        self.num_out_lier=num_out_lier
         self.voxel_size=0.0001
         self.out_lier=None
         self.out_lier_value=None
@@ -56,7 +62,7 @@ class GPISData:
     def create_outlier(self):
         self._surface_points_down.estimate_normal(self.voxel_size, 30)
         point2sdf = Point2SDF(self._surface_points_down)
-        query_points, sdf=point2sdf.sample_sdf_near_surface(number_of_points=1000)
+        query_points, sdf=point2sdf.sample_sdf_near_surface(number_of_points=self.num_out_lier)
         self.out_lier=query_points[sdf>0,:]
         self.out_lier_value=sdf[sdf>0]
     @property
@@ -85,27 +91,28 @@ class GPISData:
         radius = pdist(self._surface_points.point, metric="euclidean")
         self._R = np.max(radius)
 
-class GPIS(GaussianProcessRegressor):
-    def __init__(self, kernel=None, *, alpha=1e-10,
+class GPISModel(GaussianProcessRegressor):
+    def __init__(self, kernel=None, *, alpha=0.2,
                  optimizer="fmin_l_bfgs_b", n_restarts_optimizer=0,
                  normalize_y=False, copy_X_train=True, random_state=None):
-        super(GPIS, self).__init__()
-        self.custom_kernel = kernel
+        super(GPISModel, self).__init__(kernel=kernel)
+        self.Kernel =kernel
         self._X_source = None
         self._Y_source = None
         self._X_target = None
-        
+
     def fit(self, X, y):
         self.X_source=X
         self.Y_source=y
         return super().fit(X, y)
+    def prediction(self, X):
+        K_trans = self.kernel_(X, self.X_train_)
+        y_mean = K_trans@self.Alpha
+        #y_mean = self._y_train_std * y_mean + self._y_train_mean
+        return y_mean
     @property
     def Alpha(self):
         return self.alpha_
-
-    @property
-    def Kernel(self):
-        return self.custom_kernel
 
     @property
     def X_source(self):
@@ -131,9 +138,111 @@ class GPIS(GaussianProcessRegressor):
     def X_target(self, v):
         self._X_target = v
 
+class GPISOpt:
+    def __init__(self, voxel_size, gpisModel: GPISModel = None):
+        self.voxel_size = voxel_size
+        self.gpisModel = gpisModel
+        self.sumofDetla = 0
+        self.T_update = Transformation()
+        self.obj_value=10000
+        self.l=0.01
+
+    def objective(self, target_points):
+        return np.mean(self.gpisModel.predict(target_points) ** 2)
+
+    def init(self, source: PointCloud = None, target: PointCloud = None):
+        source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True)
+        target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True)
+        transform_es = self.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
+        # Registration.draw_registration_result(source.pcd,target.pcd,transform_es.Transform)
+        return transform_es
+    def execute(self):
+        pass
+    def step(self, target_points, T_last: Transformation = None):
+        target_points_update = self.updateTarget_Point(target_points, T_last)
+        se3_epsilon = self.calculateTransformationPerturbation(target_points=target_points_update,l=self.l)
+        T_update = self.update_transformation(se3_epsilon, T_last)
+        return target_points_update, T_update 
+    
+    def update_transformation(self, se3_epsilon, T_last: Transformation):
+        return np.matmul(SE3.exp(se3_epsilon), T_last.Transform)
+
+    def updateTarget_Point(self, target_points: np.ndarray = None, transform: Transformation = None):
+        if target_points.shape[1] == 4:
+            return np.matmul(transform.Transform, target_points.T)
+        else:
+            raise ValueError(
+                "the points should be represented in the way of 4\times N")
+
+    def updateGaussNewtonBasedPerturabation(self, targe_points,l=0):
+        JTJ, JTr = self.calculateTransformationPerturbation(targe_points)
+        print("JTJ: ",JTJ.shape)
+        print("JTr: ",JTr.shape)
+        JTJ_Hat = np.zeros_like(JTJ)
+        print("JTJ_Hat: ",JTJ_Hat.shape)
+        diagonalS = np.zeros_like(JTJ)
+        print("diagonalS: ",diagonalS.shape)
+        np.fill_diagonal(diagonalS,JTJ.diagonal())
+        JTJ_Hat = JTJ + l * diagonalS
+        L_= cho_factor(JTJ_Hat, lower=True)
+        se3_epsilon = cho_solve(L_, JTr)
+        return se3_epsilon
+
+
+    def calculateTransformationPerturbation(self,target_points):
+        N,_=target_points.shape
+        BetaM = self.getBetaM(target_points)
+        DeltaM = self.getDeltaM(target_points).reshape(N,-1,6)
+        Alpha=self.gpisModel.Alpha.reshape(-1,1)
+        betaalpha = np.sum(Alpha*BetaM,axis=0).reshape(-1,1)
+        Alpha2=np.repeat(np.expand_dims(Alpha,axis=0),N,axis=0)
+        DeltaMAlpha = np.sum(DeltaM*Alpha2,axis=1).reshape(N,6,1)
+        JTJ = np.sum(np.matmul(DeltaMAlpha, DeltaMAlpha.reshape(N,1,6)),axis=0) # 6\times 6
+        JTr = np.sum(np.matmul(DeltaMAlpha, np.expand_dims(betaalpha,axis=1)),axis=0) # 6 \times 1
+        return JTJ, JTr
+
+    def getBetaM(self,target_points):
+        return self.gpisModel.kernel_(self.gpisModel.X_source, target_points)
+
+    def getDeltaM(self,target_points):
+        N,_=target_points.shape
+        N_source,_=self.gpisModel.X_source.shape
+        Ty_odot = SE3.odot(PointCloud.PointXYZ2homogeneous(target_points))  # R^(N \times 4 \times 6)
+        Ty_odot=np.repeat(Ty_odot,N_source,axis=0)
+        dk_dy = self.gpisModel.Kernel.gradient(self.gpisModel.X_source, target_points).T.reshape(-1,1)#*(target_points-self.gpisGR.X_source)
+        target_points_copy=np.repeat(copy.deepcopy(target_points),N_source,axis=0)
+        source_points_copy=np.repeat(copy.deepcopy(self.gpisModel.X_source),N,axis=0)
+        target_source_diff=(target_points_copy-source_points_copy).reshape(N*N_source,3)
+        dk=PointCloud.PointXYZ2homogeneous(dk_dy*target_source_diff).reshape(N*N_source,1,4)
+        deltaM=np.matmul(dk,Ty_odot)
+        return deltaM
+
+    def execute_registration_fpfh_pca_init(self,source_down,source_fpfh,target_down, target_fpfh):
+        corres_idx0, corres_idx1 = find_correspondences(source_fpfh, target_fpfh)
+        source_down_fpfh = source_down[corres_idx0, :]
+        target_down_fpfh = target_down[corres_idx1, :]
+
+        source_pca_vectors=get_PCA_eigen_vector(source_down_fpfh)
+        R_source=getRightHandCoordinate(source_pca_vectors[:,0],source_pca_vectors[:,1],source_pca_vectors[:,2])
+
+        target_pca_vectors=get_PCA_eigen_vector(target_down_fpfh)
+        R_target=getRightHandCoordinate(target_pca_vectors[:,0],target_pca_vectors[:,1],target_pca_vectors[:,2])
+
+        R_es=np.matmul(R_target,R_source.T)
+
+        source_down_fpfh_center=PointCloud.PointCenter(source_down_fpfh)
+        target_down_fpfh_center=PointCloud.PointCenter(target_down_fpfh)
+        trans=target_down_fpfh_center-np.matmul(R_es,source_down_fpfh_center)
+
+        transform_es=Transformation()
+        transform_es.rotation=R_es
+        transform_es.trans=trans
+        return transform_es
+
+
 if __name__ == '__main__':
     X = np.random.rand(10, 3)
     y = np.random.rand(10, 1)
     kernel = SKWilliamsMinusKernel(3)
-    gpis = GPIS(kernel=SKWilliamsMinusKernel(3), random_state=0)
+    gpis = GPISModel(kernel=SKWilliamsMinusKernel(3), random_state=0)
     gpis.fit(X, y)

@@ -48,27 +48,5 @@ class Registration:
         return reg_p2p.transformation
 
     @staticmethod
-    def execute_registration_fpfh_pca_init(source_down,source_fpfh,target_down, target_fpfh):
-        corres_idx0, corres_idx1 = find_correspondences(source_fpfh, target_fpfh)
-        source_down_fpfh = source_down[corres_idx0, :]
-        target_down_fpfh = target_down[corres_idx1, :]
-
-        source_pca_vectors=get_PCA_eigen_vector(source_down_fpfh)
-        R_source=getRightHandCoordinate(source_pca_vectors[:,0],source_pca_vectors[:,1],source_pca_vectors[:,2])
-
-        target_pca_vectors=get_PCA_eigen_vector(target_down_fpfh)
-        R_target=getRightHandCoordinate(target_pca_vectors[:,0],target_pca_vectors[:,1],target_pca_vectors[:,2])
-
-        R_es=np.matmul(R_target,R_source.T)
-
-        source_down_fpfh_center=PointCloud.PointCenter(source_down_fpfh)
-        target_down_fpfh_center=PointCloud.PointCenter(target_down_fpfh)
-        trans=target_down_fpfh_center-np.matmul(R_es,source_down_fpfh_center)
-
-        transform_es=Transformation()
-        transform_es.rotation=R_es
-        transform_es.trans=trans
-        return transform_es
-    @staticmethod
     def execute_registration_gpis():
         pass
