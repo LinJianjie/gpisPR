@@ -21,6 +21,7 @@ import numpy as np
 from skkernel import SKWilliamsMinusKernel
 from sklearn.gaussian_process import GaussianProcessRegressor
 from scipy.spatial.distance import pdist
+from scipy.linalg.blas import sgemm
 from point2SDF import Point2SDF
 from liegroups import SE3
 import transforms3d as t3d
@@ -36,7 +37,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 class GPISData:
     def __init__(self,surface_points,num_out_lier=1000) -> None:
         self._surface_points=surface_points
-        self._surface_points_down=PointCloud()
+        self._surface_points_down=surface_points
         self._surface_value=None
         self._R=1
         self.num_out_lier=num_out_lier
@@ -147,7 +148,8 @@ class GPISModel(GaussianProcessRegressor):
 
     def prediction(self, X):
         K_trans = self.kernel_(X, self.X_train_)
-        y_mean = K_trans@self.Alpha
+        print("K_trans: ",K_trans.shape)
+        y_mean=K_trans@self.Alpha
         #y_mean = self._y_train_std * y_mean + self._y_train_mean
         return y_mean
     @property

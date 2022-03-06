@@ -66,7 +66,7 @@ def test_optimization():
     opt.updateGaussNewtonBasedPerturabation(targe_points=target_points,l=0.1)
 
 def test_gpis():
-    path="/home/lin/Workspace/Projetcs/github/gpisPR/python/data/bunny_1420.pcd"
+    path="/home/lin/Workspace/Projetcs/github/gpisPR/python/data/happy.pcd"
     surface_points = PointCloud(filename=path)
     surface_points()
     gpisData=GPISData(surface_points=surface_points,num_out_lier=500)
@@ -74,9 +74,9 @@ def test_gpis():
     gpisData()
     print("gpisData.X_source: ",gpisData.X_source.shape)
     #pisModel = ConsitionPSDGPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
-    #gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
     #gpisModel = GPISModel(kernel=SKRBF(length_scale=1,length_scale_bounds="fixed"), random_state=0)
-    gpisModel = GPISModel(kernel=SKMatern(length_scale=1,length_scale_bounds="fixed",nu=1.5), random_state=0)
+    #gpisModel = GPISModel(kernel=SKMatern(length_scale=1,length_scale_bounds="fixed",nu=1.5), random_state=0)
     #gpisModel.fit(gpisData.X_source,gpisData.Y_source)
     gpisModel.fit(gpisData.X_source,gpisData.Y_source)
 
@@ -84,23 +84,25 @@ def test_gpis():
     target = PointCloud(filename=path)
     target()
     transinit = Transformation()
-    transinit.trans = np.asarray([0.1, 0.2, 0.2])
+    transinit.trans = np.asarray([0.1, 0., 0.])
     rot = t3d.euler.euler2mat(
-        DEG2RAD(0.0), DEG2RAD(180.0), DEG2RAD(0.0), 'sxyz')
+        DEG2RAD(90.0), DEG2RAD(0.0), DEG2RAD(0.0), 'sxyz')
     transinit.rotation = rot
     target.transform(transinit.Transform)
     print("start to predict")
     #PointCloud.vis([source,target])
+    print("size of target: ",target.point.shape)
     import time
     start = time.time()
     y_mean_1=gpisModel.prediction(target.point)
     end = time.time()
     print("first: ",end - start)
-    print("tar y_mean_1: ",np.sum(np.abs(y_mean_1)))
-    K_gradient=gpisModel.Kernel.gradient(gpisData.X_source,target.point)
-    print("K_gradient: ",K_gradient.shape)
+    print("tar y_mean: ",np.mean(np.abs(y_mean_1)))
+    #K_gradient=gpisModel.Kernel.gradient(gpisData.X_source,target.point)
+    #print("K_gradient: ",K_gradient.shape)
+    print("size of surface: ",surface_points.point.shape)
     y_mean_2=gpisModel.prediction(surface_points.point)
-    print("sur y_mean_2: ",np.sum(np.abs(y_mean_2)))
+    print("sur y_mean: ",np.mean(np.abs(y_mean_2)))
     #print("surface std_mean: ",y_std)
     #print("surface_value: ",surface_value[:index])
 

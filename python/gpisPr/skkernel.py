@@ -88,10 +88,8 @@ class SKWilliamsMinusKernel(Kernel):
                 K1 = squareform(self.kxx_dist)
                 np.fill_diagonal(K1, tmp2)
                 self.KXX=K1
-                print("K1:",K1.shape)
             else:
                 K1 = self.KXX
-                print("K2:",K1.shape)   
             K=K1
         else:
             if eval_gradient:
