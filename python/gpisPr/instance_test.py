@@ -16,14 +16,17 @@
 # along with python.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import copy
+
 from numpy import source
 from  liegroups import SE3
 from utils import *
 import transforms3d as t3d
-from gpis import GPISModel,GPISData,GPISOpt,ConsitionPSDGPISModel
-from skkernel import SKWilliamsMinusKernel,SKWilliamsPlusKernel,SKRBF,SKMatern
-from sklearn.gaussian_process.kernels import RBF
+from gpis import GPISModel,GPISData,GPISOpt
+from skkernel import SKWilliamsMinusKernel,SKRBF,SKMatern
 from pointCloud import PointCloud
+from registration import Registration
+
 def test_se3():
     X=Transformation()
     X.trans=np.asarray([2,3,4])
@@ -38,14 +41,15 @@ def test_se3():
     print(p33.shape)
     odot33 = SE3.odot(p33)
     print(odot33.shape)
+
 def test_gpis_kernel():
     X_source = np.random.rand(100, 3)
     y_source = np.random.rand(100, 1)
     X_target=np.random.rand(10, 3)
-    kernel = SKWilliamsMinusKernel(3)
     gpis = GPISModel(kernel=SKWilliamsMinusKernel(3), random_state=0)
     K_gradient=gpis.Kernel.gradient(X_source,X_target)
     print(K_gradient.shape)
+
 def test_optimization():
     gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(3), random_state=0)
     X_source=np.random.rand(100,3)
@@ -79,8 +83,6 @@ def test_gpis():
     #gpisModel = GPISModel(kernel=SKMatern(length_scale=1,length_scale_bounds="fixed",nu=1.5), random_state=0)
     #gpisModel.fit(gpisData.X_source,gpisData.Y_source)
     gpisModel.fit(gpisData.X_source,gpisData.Y_source)
-
-    ##    
     target = PointCloud(filename=path)
     target()
     transinit = Transformation()
@@ -105,9 +107,37 @@ def test_gpis():
     print("sur y_mean: ",np.mean(np.abs(y_mean_2)))
     #print("surface std_mean: ",y_std)
     #print("surface_value: ",surface_value[:index])
+def test_gpisOpt():
+    print("=====> Prepare the Point Cloud Data")
+    path="/home/lin/Workspace/Projetcs/github/gpisPR/python/data/bunny_1420.pcd"
+    source_surface = PointCloud(filename=path)
+    source_surface()
+    target_surface=copy.deepcopy(source_surface)
+    transinit = Transformation()
+    transinit.trans = np.asarray([0.1, 0.2, 0.])
+    rot = t3d.euler.euler2mat(DEG2RAD(90.0), DEG2RAD(180.0), DEG2RAD(0.0), 'sxyz')
+    transinit.rotation = rot
+    target_surface.transform(transinit.Transform)
+    Registration.draw_registraion_init(source=source_surface,target=target_surface)
 
+    # prepera the GPIS Data
+    print("=====> Prepare the GPIS Data")
+    gpisData=GPISData(surface_points=source_surface,num_out_lier=500)
+    gpisData.voxel_points(0.003)
+    gpisData()
+    print("gpisData.X_source: ",gpisData.X_source.shape)
+    print("====> Prepare the GPIS Model")
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
+    gpisModel.fit(gpisData.X_source,gpisData.Y_source)
+    print("=====> start to optimiztion")
+    opt = GPISOpt(voxel_size=0.003,gpisModel=gpisModel)
+    transform_es=opt.init(source_surface,target_surface)
+    Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_es)
+
+    
 if __name__=="__main__":
     #test_se3() # checked
     #test_gpis_kernel() # checked
     #test_optimization()
-    test_gpis()
+    #test_gpis()
+    test_gpisOpt()

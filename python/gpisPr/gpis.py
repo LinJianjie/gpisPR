@@ -46,7 +46,14 @@ class GPISData:
         self.out_lier_value=None
         self._X_source=None
         self._Y_source=None
-        
+    
+    def __call__(self):
+        self.create_outlier()
+        self._X_source=np.vstack([self._surface_points_down.point,self.out_lier])
+        surface_value=np.zeros(self._surface_points_down.size)
+        self._Y_source=np.concatenate([surface_value,self.out_lier_value])
+        self.compute_max_radius()
+
     @property
     def X_source(self):
         return self._X_source
@@ -54,13 +61,6 @@ class GPISData:
     def Y_source(self):
         return self._Y_source
 
-    def __call__(self):
-        self.create_outlier()
-        self._X_source=np.vstack([self._surface_points_down.point,self.out_lier])
-        surface_value=np.zeros(self._surface_points_down.size)
-        self._Y_source=np.concatenate([surface_value,self.out_lier_value])
-        self.compute_max_radius()
-    
     def create_outlier(self):
         self._surface_points_down.estimate_normal(self.voxel_size, 30)
         point2sdf = Point2SDF(self._surface_points_down)
@@ -138,23 +138,23 @@ class GPISModel(GaussianProcessRegressor):
         self._X_target = v
 
 class GPISOpt:
-    def __init__(self, voxel_size, gpisModel: GPISModel = None):
-        self.voxel_size = voxel_size
+    def __init__(self, voxel_size,gpisModel: GPISModel = None):
         self.gpisModel = gpisModel
+        self.voxel_size = voxel_size
         self.sumofDetla = 0
         self.T_update = Transformation()
         self.obj_value=10000
         self.l=0.01
 
     def objective(self, target_points):
-        return np.mean(self.gpisModel.predict(target_points) ** 2)
+        return np.mean(self.gpisModel.prediction(target_points) ** 2)
 
     def init(self, source: PointCloud = None, target: PointCloud = None):
         source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True)
         target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True)
         transform_es = self.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
-        # Registration.draw_registration_result(source.pcd,target.pcd,transform_es.Transform)
         return transform_es
+        
     def execute(self):
         pass
     def step(self, target_points, T_last: Transformation = None):

@@ -29,14 +29,20 @@ import transforms3d as t3d
 
 class Registration:
     @staticmethod
-    def draw_registration_result(source, target, transformation):
+    def draw_registration_result(source:PointCloud,target:PointCloud, transformation:Transformation):
         source_temp = copy.deepcopy(source)
         target_temp = copy.deepcopy(target)
-        source_temp.paint_uniform_color([1, 0.706, 0])
-        target_temp.paint_uniform_color([0, 0.651, 0.929])
-        source_temp.transform(transformation)
-        o3d.visualization.draw_geometries([source_temp, target_temp])
-
+        source_temp.pcd.paint_uniform_color([1, 0.706, 0])
+        target_temp.pcd.paint_uniform_color([0, 0.651, 0.929])
+        source_temp.transform(transformation.Transform)
+        o3d.visualization.draw_geometries([source_temp.pcd, target_temp.pcd])
+    @staticmethod
+    def draw_registraion_init(source:PointCloud,target:PointCloud):
+        source_temp = copy.deepcopy(source)
+        target_temp = copy.deepcopy(target)
+        source_temp.pcd.paint_uniform_color([1, 0.706, 0])
+        target_temp.pcd.paint_uniform_color([0, 0.651, 0.929])
+        o3d.visualization.draw_geometries([source_temp.pcd, target_temp.pcd])
     @staticmethod
     def ICP_init(source, target, max_distance_threshold, transinit):
         reg_p2p = o3d.pipelines.registration.registration_icp(source, target, max_distance_threshold,
@@ -50,3 +56,4 @@ class Registration:
     @staticmethod
     def execute_registration_gpis():
         pass
+    

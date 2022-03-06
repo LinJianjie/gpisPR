@@ -32,6 +32,7 @@ class PointCloud:
         self._path = filename
         self._pcd = o3d.geometry.PointCloud()
         self.normal=None
+        self.voxel_size=0.00001
 
     def __call__(self):
         self._pcd = o3d.io.read_point_cloud(self.path)
@@ -69,9 +70,25 @@ class PointCloud:
     @property
     def path(self):
         return self._path
-    def voxel_down_sample(self,voxel_size):
-        pcd_down = self._pcd.voxel_down_sample(voxel_size)
+
+    def voxel_down_sample(self,voxel_size,toNumpy=False):
+        self.voxel_size=voxel_size
+        pcd_down = self._pcd.voxel_down_sample(self.voxel_size)
+        if toNumpy:
+            return PointCloud.pca2xyz(pcd_down)
         return pcd_down
+
+    def compute_fpfh(self,pcd_down,toNumpy=False):
+        if not pcd_down.has_normals:
+            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 2.0,
+                                                                       max_nn=30))
+        pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_down,
+                                                                   o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 5.0,
+                                                                                                        max_nn=100))
+        if toNumpy:
+           return np.array(pcd_fpfh.data).T                                                                                            
+        return pcd_fpfh                      
+                                                                                   
     def preprocess_point_cloud(self, voxel_size, toNumpy=False):
         pcd_down = self.voxel_down_sample(voxel_size)
         pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size * 2.0,
