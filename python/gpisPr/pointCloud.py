@@ -25,7 +25,7 @@ import numpy as np
 import open3d as o3d
 import transforms3d as t3d
 import copy 
-from typing import List
+import trimesh
 
 class PointCloud:
     def __init__(self, filename=None):
@@ -35,13 +35,38 @@ class PointCloud:
         self.voxel_size=0.00001
 
     def __call__(self):
-        self._pcd = o3d.io.read_point_cloud(self.path)
+        ending=self._path.split(".")[-1]
+        if ending=="pcd":
+            print("===> load pcd")
+            self.load_pcd()
+        if ending=="ply":
+            print("===> load ply")
+            self.load_mesh_and_sample()
+        if ending=="h5":
+            print("===> load h5")
+            self.load_completion3D()
 
+    def load_pcd(self):
+        self._pcd = o3d.io.read_point_cloud(self.path)
+    def load_mesh_and_sample(self,sample_point_count=2048):
+        mesh=trimesh.load_mesh(self.path)
+        points = mesh.sample(sample_point_count, return_index=False)
+        self._pcd=PointCloud.xyz2pcd(points)
+
+    def load_completion3D(self):
+        pass
+    def centralized(self):
+        self._pcd.translate(self._pcd.get_center()*-1)
+    def scale(self,scale_):
+        self.centralized()
+        self._pcd.scale(scale_,center=self._pcd.get_center())
     def transform(self, transinit):
         self._pcd.transform(transinit)
-    def estimate_normal(self,radius,max_knn):
-        self.pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.1,
-                                                                       max_nn=30))
+    def get_center(self):
+        return self._pcd.get_center()
+    def estimate_normal(self,radius=0.1,max_knn=30):
+        self.pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius,
+                                                                       max_nn=max_knn))
     @property
     def normal(self):
         return np.asarray(self.pcd.normals)

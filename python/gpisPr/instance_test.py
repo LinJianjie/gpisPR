@@ -109,28 +109,37 @@ def test_gpis():
     #print("surface_value: ",surface_value[:index])
 def test_gpisOpt():
     print("=====> Prepare the Point Cloud Data")
-    path="/home/lin/Workspace/Projetcs/github/gpisPR/python/data/bunny_1420.pcd"
+    path="/home/lin/Workspace/Projetcs/github/gpisPR/python/data/bathtub_0154.ply"
     source_surface = PointCloud(filename=path)
     source_surface()
+    source_surface.scale(scale_=0.0001)
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
     transinit.trans = np.asarray([0.1, 0.2, 0.])
-    rot = t3d.euler.euler2mat(DEG2RAD(90.0), DEG2RAD(180.0), DEG2RAD(0.0), 'sxyz')
+    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(00.0), DEG2RAD(60.0), 'sxyz')
     transinit.rotation = rot
     target_surface.transform(transinit.Transform)
     Registration.draw_registraion_init(source=source_surface,target=target_surface)
 
     # prepera the GPIS Data
     print("=====> Prepare the GPIS Data")
+    voxel_size=0.01
     gpisData=GPISData(surface_points=source_surface,num_out_lier=500)
-    gpisData.voxel_points(0.003)
+    gpisData.voxel_points(voxel_size)
     gpisData()
     print("gpisData.X_source: ",gpisData.X_source.shape)
     print("====> Prepare the GPIS Model")
-    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
+    print("gpisData.maxR: ",gpisData.maxR)
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=gpisData.maxR*2), random_state=0)
+    #gpisModel = GPISModel(kernel=SKMatern(length_scale=1,length_scale_bounds="fixed",nu=1.5), random_state=0)
     gpisModel.fit(gpisData.X_source,gpisData.Y_source)
+    y_mean_1=gpisModel.prediction(target_surface.point)
+    print("target: ",np.mean(np.abs(y_mean_1)))
+    y_mean_2=gpisModel.prediction(source_surface.point)
+    print("source: ",np.mean(np.abs(y_mean_2)))
+
     print("=====> start to optimiztion")
-    opt = GPISOpt(voxel_size=0.003,gpisModel=gpisModel)
+    opt = GPISOpt(voxel_size=voxel_size,gpisModel=gpisModel)
     transform_es=opt.init(source_surface,target_surface)
     Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_es)
 

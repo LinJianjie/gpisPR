@@ -1,3 +1,6 @@
 __pycache__
 .idea
 .vscode
+*.h5
+*.ply
+*.pcd

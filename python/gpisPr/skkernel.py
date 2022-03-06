@@ -69,11 +69,12 @@ class SKWilliamsPlusKernel(Kernel):
 
 
 class SKWilliamsMinusKernel(Kernel):
-    def __init__(self, R):
+    def __init__(self, R, alpha=0.1):
         self.name = 'SKWilliamsMinusKernel'
         self.R = R
         self.has_kxx=False
         self.KXX=None
+        self.alpha=alpha
     def __call__(self, X, Y=None, eval_gradient=False):
         X = np.atleast_2d(X)
         
@@ -86,7 +87,7 @@ class SKWilliamsMinusKernel(Kernel):
                 self.kxx_dist = 2*tmp1*d1-3*self.R * tmp1+tmp2
                 # convert from upper-triangular matrix to square matrix
                 K1 = squareform(self.kxx_dist)
-                np.fill_diagonal(K1, tmp2)
+                np.fill_diagonal(K1, tmp2+self.alpha)
                 self.KXX=K1
             else:
                 K1 = self.KXX
