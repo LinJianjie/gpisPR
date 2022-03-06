@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with python.  If not, see <http://www.gnu.org/licenses/>.
 
+from tkinter.messagebox import NO
 from pointCloud import PointCloud
 import numpy as np
 from skkernel import SKWilliamsMinusKernel
@@ -88,9 +89,52 @@ class GPISData:
     def maxR(self):
         return self._R
     def compute_max_radius(self):
-        radius = pdist(self._surface_points.point, metric="euclidean")
+        radius = pdist(self.X_source, metric="euclidean")
         self._R = np.max(radius)
+        print("max_R: ",self._R)
+class ConsitionPSDGPISModel:
+    def __init__(self,kernel=None,random_state=0) -> None:
+         self.Kernel =kernel
+         self.alpha_=None
+    def fit(self, X, y):
+        self.X_source=X
+        self.Y_source=y
+        K=self.Kernel(X)
+        self.Alpha=np.matmul(np.linalg.inv(K),y)
+    def prediction(self, X):
+        K_trans = self.Kernel(X, self.X_source)
+        y_mean = K_trans@self.Alpha
+        return y_mean
+    @property
+    def Alpha(self):
+        return self.alpha_
+    @Alpha.setter
+    def Alpha(self,v):
+        self.alpha_=v
+    @property
+    def X_source(self):
+        return self._X_source
 
+    @X_source.setter
+    def X_source(self, v):
+        self._X_source = v
+
+    @property
+    def Y_source(self):
+        return self._Y_source
+
+    @Y_source.setter
+    def Y_source(self, v):
+        self._Y_source = v
+
+    @property
+    def X_target(self):
+        return self._X_target
+
+    @X_target.setter
+    def X_target(self, v):
+        self._X_target = v
+    
 class GPISModel(GaussianProcessRegressor):
     def __init__(self, kernel=None, *, alpha=0.2,
                  optimizer="fmin_l_bfgs_b", n_restarts_optimizer=0,
@@ -101,10 +145,6 @@ class GPISModel(GaussianProcessRegressor):
         self._Y_source = None
         self._X_target = None
 
-    def fit(self, X, y):
-        self.X_source=X
-        self.Y_source=y
-        return super().fit(X, y)
     def prediction(self, X):
         K_trans = self.kernel_(X, self.X_train_)
         y_mean = K_trans@self.Alpha
@@ -113,10 +153,12 @@ class GPISModel(GaussianProcessRegressor):
     @property
     def Alpha(self):
         return self.alpha_
-
+    @Alpha.setter
+    def Alpha(self,v):
+        self.alpha_=v
     @property
     def X_source(self):
-        return self._X_source
+        return self.X_train_
 
     @X_source.setter
     def X_source(self, v):

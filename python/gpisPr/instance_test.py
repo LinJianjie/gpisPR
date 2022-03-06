@@ -20,8 +20,8 @@ from numpy import source
 from  liegroups import SE3
 from utils import *
 import transforms3d as t3d
-from gpis import GPISModel,GPISData,GPISOpt
-from skkernel import SKWilliamsMinusKernel,SKWilliamsPlusKernel,SKRBF
+from gpis import GPISModel,GPISData,GPISOpt,ConsitionPSDGPISModel
+from skkernel import SKWilliamsMinusKernel,SKWilliamsPlusKernel,SKRBF,SKMatern
 from sklearn.gaussian_process.kernels import RBF
 from pointCloud import PointCloud
 def test_se3():
@@ -70,11 +70,16 @@ def test_gpis():
     surface_points = PointCloud(filename=path)
     surface_points()
     gpisData=GPISData(surface_points=surface_points,num_out_lier=500)
-    gpisData.voxel_points(0.005)
+    gpisData.voxel_points(0.003)
     gpisData()
     print("gpisData.X_source: ",gpisData.X_source.shape)
-    gpisModel = GPISModel(kernel=SKRBF(length_scale=1,length_scale_bounds="fixed"), random_state=0)
+    #pisModel = ConsitionPSDGPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
+    #gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
+    #gpisModel = GPISModel(kernel=SKRBF(length_scale=1,length_scale_bounds="fixed"), random_state=0)
+    gpisModel = GPISModel(kernel=SKMatern(length_scale=1,length_scale_bounds="fixed",nu=1.5), random_state=0)
+    #gpisModel.fit(gpisData.X_source,gpisData.Y_source)
     gpisModel.fit(gpisData.X_source,gpisData.Y_source)
+
     ##    
     target = PointCloud(filename=path)
     target()
@@ -84,6 +89,7 @@ def test_gpis():
         DEG2RAD(0.0), DEG2RAD(180.0), DEG2RAD(0.0), 'sxyz')
     transinit.rotation = rot
     target.transform(transinit.Transform)
+    print("start to predict")
     #PointCloud.vis([source,target])
     import time
     start = time.time()
