@@ -26,6 +26,8 @@ from gpis import GPISModel,GPISData,GPISOpt
 from skkernel import SKWilliamsMinusKernel,SKRBF,SKMatern
 from pointCloud import PointCloud
 from registration import Registration
+import sys
+import os
 
 def test_se3():
     X=Transformation()
@@ -70,11 +72,12 @@ def test_optimization():
     opt.updateGaussNewtonBasedPerturabation(targe_points=target_points,l=0.1)
 
 def test_gpis():
-    path="/home/lin/Workspace/Projetcs/github/gpisPR/python/data/happy.pcd"
-    surface_points = PointCloud(filename=path)
+    print(os.getcwd())
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
+    surface_points = PointCloud(filename=file_path)
     surface_points()
     gpisData=GPISData(surface_points=surface_points,num_out_lier=500)
-    gpisData.voxel_points(0.003)
+    gpisData.voxel_points(0.005)
     gpisData()
     print("gpisData.X_source: ",gpisData.X_source.shape)
     #pisModel = ConsitionPSDGPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR), random_state=0)
@@ -109,10 +112,10 @@ def test_gpis():
     #print("surface_value: ",surface_value[:index])
 def test_gpisOpt():
     print("=====> Prepare the Point Cloud Data")
-    path="/home/lin/Workspace/Projetcs/github/gpisPR/python/data/bathtub_0154.ply"
-    source_surface = PointCloud(filename=path)
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
+    source_surface = PointCloud(filename=file_path)
     source_surface()
-    source_surface.scale(scale_=0.0001)
+    source_surface.scale(scale_=1)
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
     transinit.trans = np.asarray([0.1, 0.2, 0.])
@@ -123,7 +126,7 @@ def test_gpisOpt():
 
     # prepera the GPIS Data
     print("=====> Prepare the GPIS Data")
-    voxel_size=0.01
+    voxel_size=0.005
     gpisData=GPISData(surface_points=source_surface,num_out_lier=500)
     gpisData.voxel_points(voxel_size)
     gpisData()
