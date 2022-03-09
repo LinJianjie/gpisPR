@@ -108,7 +108,7 @@ class SKWilliamsMinusKernel(Kernel):
             return K
     def gradient(self,X,Y):
         d1 = cdist(X, Y,metric='euclidean')
-        K_gradient=6*(d1-self.R)
+        K_gradient=6*(d1-self.R)*d1
         return K_gradient
     def is_stationary(self):
         """Returns whether the kernel is stationary. """

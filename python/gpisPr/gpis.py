@@ -21,6 +21,7 @@ import numpy as np
 from skkernel import SKWilliamsMinusKernel
 from sklearn.gaussian_process import GaussianProcessRegressor
 from scipy.spatial.distance import pdist
+from sklearn.preprocessing import normalize
 from scipy.linalg.blas import sgemm
 from point2SDF import Point2SDF
 from liegroups import SE3
@@ -202,18 +203,29 @@ class GPISOpt:
 
     def getBetaM(self,target_points):
         return self.gpisModel.kernel_(self.gpisModel.X_source, target_points)
-
+    def getNormDerivative(self, point_source, point_target):
+        N,_=point_target.shape
+        N_source,_=point_source.shape
+        target_points_copy=np.repeat(copy.deepcopy(point_target),N_source,axis=0)
+        source_points_copy=np.repeat(copy.deepcopy(point_source),N,axis=0)
+        target_source_diff=(target_points_copy-source_points_copy).reshape(N*N_source,3)
+        target_source_diff_abs=np.abs(target_source_diff)
+        target_source_diff_norm=normalize(target_source_diff_abs)
+        norm_derivative=np.sign(target_source_diff)*target_source_diff_norm
+        return norm_derivative
     def getDeltaM(self,target_points):
         N,_=target_points.shape
         N_source,_=self.gpisModel.X_source.shape
         Ty_odot = SE3.odot(PointCloud.PointXYZ2homogeneous(target_points))  # R^(N \times 4 \times 6)
         Ty_odot=np.repeat(Ty_odot,N_source,axis=0)
-        dk_dy = self.gpisModel.Kernel.gradient(self.gpisModel.X_source, target_points).T.reshape(-1,1)#*(target_points-self.gpisGR.X_source)
-        target_points_copy=np.repeat(copy.deepcopy(target_points),N_source,axis=0)
-        source_points_copy=np.repeat(copy.deepcopy(self.gpisModel.X_source),N,axis=0)
-        target_source_diff=(target_points_copy-source_points_copy).reshape(N*N_source,3)
-        dk=PointCloud.PointXYZ2homogeneous(dk_dy*target_source_diff).reshape(N*N_source,1,4)
-        deltaM=np.matmul(dk,Ty_odot)
+        dk_dr = self.gpisModel.Kernel.gradient(self.gpisModel.X_source, target_points).T.reshape(-1,1)
+        dr_dy=self.getNormDerivative(self.gpisModel.X_source,target_points)
+        #target_points_copy=np.repeat(copy.deepcopy(target_points),N_source,axis=0)
+        #source_points_copy=np.repeat(copy.deepcopy(self.gpisModel.X_source),N,axis=0)
+        #target_source_diff=(target_points_copy-source_points_copy).reshape(N*N_source,3)
+        #dk=PointCloud.PointXYZ2homogeneous(dk_dy*target_source_diff).reshape(N*N_source,1,4)
+        dk_dy=PointCloud.PointXYZ2homogeneous(dk_dr*dr_dy).reshape(N*N_source,1,4)
+        deltaM=np.matmul(dk_dy,Ty_odot)
         return deltaM
 
     def execute_registration_fpfh_pca_init(self,source_down,source_fpfh,target_down, target_fpfh):
