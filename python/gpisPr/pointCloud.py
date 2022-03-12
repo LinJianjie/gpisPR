@@ -31,6 +31,7 @@ class PointCloud:
     def __init__(self, filename=None):
         self._path = filename
         self._pcd = o3d.geometry.PointCloud()
+        self._pcd_down = o3d.geometry.PointCloud()
         self.normal=None
         self.voxel_size=0.00001
 
@@ -79,7 +80,9 @@ class PointCloud:
     @property
     def point(self):
         return PointCloud.pca2xyz(self._pcd)
-
+    @property
+    def point_down(self):
+        return PointCloud.pca2xyz(self._pcd_down)
     @point.setter
     def point(self, v):
         self._pcd = PointCloud.xyz2pcd(v)
@@ -96,12 +99,15 @@ class PointCloud:
     def path(self):
         return self._path
 
-    def voxel_down_sample(self,voxel_size,toNumpy=False):
+    def voxel_down_sample(self,voxel_size,toNumpy=False,inline=False):
         self.voxel_size=voxel_size
         pcd_down = self._pcd.voxel_down_sample(self.voxel_size)
-        if toNumpy:
-            return PointCloud.pca2xyz(pcd_down)
-        return pcd_down
+        if inline:
+            self._pcd_down=pcd_down
+        else:
+            if toNumpy:
+                return PointCloud.pca2xyz(pcd_down)
+            return pcd_down
 
     def compute_fpfh(self,pcd_down,toNumpy=False):
         if not pcd_down.has_normals:

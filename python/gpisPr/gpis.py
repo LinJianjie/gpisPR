@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with python.  If not, see <http://www.gnu.org/licenses/>.
 
+from pydoc import doc
 from tkinter.messagebox import NO
 from pointCloud import PointCloud
 import numpy as np
@@ -37,7 +38,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 class GPISData:
     def __init__(self,surface_points,num_out_lier=1000) -> None:
-        self._surface_points=surface_points
+        self._surface_points=copy.deepcopy(surface_points)
         self._surface_points_down=copy.deepcopy(surface_points)
         self._surface_value=None
         self._R=1
@@ -143,37 +144,48 @@ class GPISOpt:
         self.gpisModel = gpisModel
         self.voxel_size = voxel_size
         self.sumofDetla = 0
-        self.T_update = Transformation()
+        self.T_last = Transformation()
         self.obj_value=10000
+        self.obj_opt_min_=0
+        self.obj_last=1000000
         self.l=0.01
-
+        self.stop_condition=0.0001
+        self.max_iteration=100
+    @property
+    def obj_opt_min(self):
+        return self.obj_opt_min_
+    @obj_opt_min.setter
+    def obj_opt_min(self,v):
+        self.obj_opt_min_=v
     def objective(self, target_points):
-        return np.mean(self.gpisModel.prediction(target_points) ** 2)
-
+        return np.mean(np.abs(self.gpisModel.prediction(target_points)))
+    def check_objective_improvement(self, target_points_updated):
+        new_objective=self.objective(target_points=target_points_updated)
+        return new_objective<self.obj_last
+        
     def init(self, source: PointCloud = None, target: PointCloud = None):
         source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True)
         target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True)
         transform_es = self.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
         return transform_es
         
-    def execute(self):
-        pass
+    def execute(self,source: PointCloud = None, target: PointCloud = None):
+        iteration_step=0
+        transinit=self.init(source=source,target=target)
+        self.T_last=transinit
+        while np.abs(self.obj_last-self.obj_opt_min_)>self.stop_condition:
+            target_points_update, self.T_last=self.step(target_points=target,T_last=self.T_last)
+            obj_update_value=self.objective(target_points=target_points_update)
+            self.obj_last=obj_update_value
+            iteration_step=iteration_step+1
+            if iteration_step>self.max_iteration:
+                break
+        
     def step(self, target_points, T_last: Transformation = None):
         target_points_update = self.updateTarget_Point(target_points, T_last)
-        se3_epsilon = self.calculateTransformationPerturbation(target_points=target_points_update,l=self.l)
+        se3_epsilon = self.updateGaussNewtonBasedPerturabation(target_points=target_points_update,l=self.l)
         T_update = self.update_transformation(se3_epsilon, T_last)
         return target_points_update, T_update 
-    
-    def update_transformation(self, se3_epsilon, T_last: Transformation):
-        return np.matmul(SE3.exp(se3_epsilon), T_last.Transform)
-
-    def updateTarget_Point(self, target_points: np.ndarray = None, transform: Transformation = None):
-        if target_points.shape[1] == 4:
-            return np.matmul(transform.Transform, target_points.T)
-        else:
-            raise ValueError(
-                "the points should be represented in the way of 4\times N")
-
     def updateGaussNewtonBasedPerturabation(self, targe_points,l=0):
         JTJ, JTr = self.calculateTransformationPerturbation(targe_points)
         print("JTJ: ",JTJ.shape)
@@ -187,8 +199,6 @@ class GPISOpt:
         L_= cho_factor(JTJ_Hat, lower=True)
         se3_epsilon = cho_solve(L_, JTr)
         return se3_epsilon
-
-
     def calculateTransformationPerturbation(self,target_points):
         N,_=target_points.shape
         BetaM = self.getBetaM(target_points)
@@ -200,6 +210,16 @@ class GPISOpt:
         JTJ = np.sum(np.matmul(DeltaMAlpha, DeltaMAlpha.reshape(N,1,6)),axis=0) # 6\times 6
         JTr = np.sum(np.matmul(DeltaMAlpha, np.expand_dims(betaalpha,axis=1)),axis=0) # 6 \times 1
         return JTJ, JTr
+
+    def update_transformation(self, se3_epsilon, T_last: Transformation):
+        return np.matmul(SE3.exp(se3_epsilon), T_last.Transform)
+
+    def updateTarget_Point(self, target_points: np.ndarray = None, transform: Transformation = None):
+        if target_points.shape[1] == 4:
+            return PointCloud.Homogeneous2PointXYZ(np.matmul(transform.Transform, target_points.T))
+        if target_points.shape[1] == 3:
+            return PointCloud.Homogeneous2PointXYZ(np.matmul(transform.Transform, PointCloud.PointXYZ2homogeneous(target_points).T))
+
 
     def getBetaM(self,target_points):
         return self.gpisModel.kernel_(self.gpisModel.X_source, target_points)
@@ -220,10 +240,10 @@ class GPISOpt:
         Ty_odot=np.repeat(Ty_odot,N_source,axis=0)
         dk_dr = self.gpisModel.Kernel.gradient(self.gpisModel.X_source, target_points).T.reshape(-1,1)
         dr_dy=self.getNormDerivative(self.gpisModel.X_source,target_points)
-        #target_points_copy=np.repeat(copy.deepcopy(target_points),N_source,axis=0)
+        """target_points_copy=np.repeat(copy.deepcopy(target_points),N_source,axis=0)
         #source_points_copy=np.repeat(copy.deepcopy(self.gpisModel.X_source),N,axis=0)
         #target_source_diff=(target_points_copy-source_points_copy).reshape(N*N_source,3)
-        #dk=PointCloud.PointXYZ2homogeneous(dk_dy*target_source_diff).reshape(N*N_source,1,4)
+        #dk=PointCloud.PointXYZ2homogeneous(dk_dy*target_source_diff).reshape(N*N_source,1,4)"""
         dk_dy=PointCloud.PointXYZ2homogeneous(dk_dr*dr_dy).reshape(N*N_source,1,4)
         deltaM=np.matmul(dk_dy,Ty_odot)
         return deltaM
