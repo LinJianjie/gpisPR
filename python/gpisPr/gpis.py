@@ -186,8 +186,8 @@ class GPISOpt:
         se3_epsilon = self.updateGaussNewtonBasedPerturabation(target_points=target_points_update,l=self.l)
         T_update = self.update_transformation(se3_epsilon, T_last)
         return target_points_update, T_update 
-    def updateGaussNewtonBasedPerturabation(self, targe_points,l=0):
-        JTJ, JTr = self.calculateTransformationPerturbation(targe_points)
+    def updateGaussNewtonBasedPerturabation(self, target_points,l=0):
+        JTJ, JTr = self.calculateTransformationPerturbation(target_points)
         print("JTJ: ",JTJ.shape)
         print("JTr: ",JTr.shape)
         JTJ_Hat = np.zeros_like(JTJ)
@@ -212,7 +212,8 @@ class GPISOpt:
         return JTJ, JTr
 
     def update_transformation(self, se3_epsilon, T_last: Transformation):
-        return np.matmul(SE3.exp(se3_epsilon), T_last.Transform)
+        se3_epsilon=se3_epsilon.reshape(-1)
+        return np.matmul(SE3.exp(se3_epsilon).as_matrix(), T_last.Transform)
 
     def updateTarget_Point(self, target_points: np.ndarray = None, transform: Transformation = None):
         if target_points.shape[1] == 4:

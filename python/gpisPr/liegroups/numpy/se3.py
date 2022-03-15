@@ -114,7 +114,6 @@ class SE3Matrix(_base.SEMatrixBase):
         """
         if len(xi) != cls.dof:
             raise ValueError("xi must have length {}".format(cls.dof))
-
         rho = xi[0:3]
         phi = xi[3:6]
         return cls(cls.RotationType.exp(phi),

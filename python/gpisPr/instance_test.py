@@ -128,7 +128,7 @@ def test_gpisOpt():
     rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(00.0), DEG2RAD(60.0), 'sxyz')
     transinit.rotation = rot
     target_surface.transform(transinit.Transform)
-    Registration.draw_registraion_init(source=source_surface,target=target_surface)
+    #Registration.draw_registraion_init(source=source_surface,target=target_surface)
 
     # prepera the GPIS Data
     print("=====> Prepare the GPIS Data")
@@ -153,8 +153,8 @@ def test_gpisOpt():
     print("=====> start to optimiztion")
     opt = GPISOpt(voxel_size=voxel_size,gpisModel=gpisModel)
     transform_es=opt.init(source_surface,target_surface)
-    Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_es)
-
+    #Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_es)
+    opt.step(target_points=target_surface.point_down,T_last=transform_es)
     
 if __name__=="__main__":
     #test_se3() # checked
