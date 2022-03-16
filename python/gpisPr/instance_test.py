@@ -17,13 +17,14 @@
 
 
 import copy
+from matplotlib.transforms import Transform
 
 from numpy import source
 from  liegroups import SE3
 from utils import *
 import transforms3d as t3d
 from gpis import GPISModel,GPISData,GPISOpt
-from skkernel import SKWilliamsMinusKernel,SKRBF,SKMatern
+from skkernel import SKWilliamsPlusKernel,SKWilliamsMinusKernel,SKRBF,SKMatern
 from pointCloud import PointCloud
 from registration import Registration
 import sys
@@ -67,7 +68,7 @@ def test_optimization():
     opt = GPISOpt(voxel_size=0.01,gpisModel=gpisModel)
     transinit = Transformation()
     transinit.trans = np.asarray([0.1, 0.2, 0.])
-    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(00.0), DEG2RAD(60.0), 'sxyz')
+    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(180.0), DEG2RAD(60.0), 'sxyz')
     transinit.rotation = rot
     target_update=opt.updateTarget_Point(target_points=target_points,transform=transinit)
     print(target_update.shape)
@@ -117,45 +118,70 @@ def test_gpis():
     #print("surface std_mean: ",y_std)
     #print("surface_value: ",surface_value[:index])
 def test_gpisOpt():
+    vis=True
     print("=====> Prepare the Point Cloud Data")
-    file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/bunny_1420.pcd")
     source_surface = PointCloud(filename=file_path)
     source_surface()
     source_surface.scale(scale_=1)
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
     transinit.trans = np.asarray([0.1, 0.2, 0.])
-    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(00.0), DEG2RAD(60.0), 'sxyz')
+    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(60.0), DEG2RAD(80.0), 'sxyz')
     transinit.rotation = rot
     target_surface.transform(transinit.Transform)
-    #Registration.draw_registraion_init(source=source_surface,target=target_surface)
+    if vis:
+        Registration.draw_registraion_init(source=source_surface,target=target_surface)
 
     # prepera the GPIS Data
     print("=====> Prepare the GPIS Data")
-    voxel_size=0.005
-    gpisData=GPISData(surface_points=source_surface,num_out_lier=500)
+    voxel_size=0.001
+    gpisData=GPISData(surface_points=source_surface,num_in_out_lier=500,has_in_lier=True)
     gpisData.voxel_points(voxel_size)
     gpisData()
     print("gpisData.X_source: ",gpisData.X_source.shape)
     target_surface.voxel_down_sample(voxel_size=voxel_size,inline=True)
     source_surface.voxel_down_sample(voxel_size=voxel_size,inline=True)
-    print("down sampled target: ",target_surface.size)
     print("====> Prepare the GPIS Model")
     print("gpisData.maxR: ",gpisData.maxR)
-    #gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=gpisData.maxR*2), random_state=0)
-    gpisModel = GPISModel(kernel=SKMatern(length_scale=1,length_scale_bounds="fixed",nu=1.5), random_state=0)
-    gpisModel.fit(gpisData.X_source,gpisData.Y_source)
+    #gpisModel = GPISModel(kernel=SKWilliamsPlusKernel(R=gpisData.maxR,alpha=0.1), random_state=0)
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0.1), random_state=0)
+    #gpisModel=GPISModel(kernel=SKRBF(length_scale=1,length_scale_bounds="fixed"), random_state=0)
+    #gpisModel = GPISModel(kernel=SKMatern(length_scale=10,length_scale_bounds="fixed",nu=1.5), random_state=0)
+    gpisModel.fit(gpisData.X_source, gpisData.Y_source)
+    y_mean_source=gpisModel.prediction(source_surface.point)
+    print("source: ",np.mean(np.abs(y_mean_source)))
     y_mean_1=gpisModel.prediction(target_surface.point_down)
-    print("target: ",np.mean(np.abs(y_mean_1)))
-    y_mean_2=gpisModel.prediction(source_surface.point_down)
-    print("source: ",np.mean(np.abs(y_mean_2)))
+    print("original target: ",np.mean(np.abs(y_mean_1)))
 
     print("=====> start to optimiztion")
     opt = GPISOpt(voxel_size=voxel_size,gpisModel=gpisModel)
-    transform_es=opt.init(source_surface,target_surface)
-    #Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_es)
-    opt.step(target_points=target_surface.point_down,T_last=transform_es)
-    
+    transform_target2source=opt.init(source_surface,target_surface)
+    print("transform_target2source:\n ",transform_target2source.Transform)
+    target_points_init = opt.updateTarget_Point(target_surface.point, transform_target2source)
+    y_mean_2=gpisModel.prediction(target_points_init)
+    print("init target: ",np.mean(np.abs(y_mean_2)))
+    if vis:
+        Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_target2source,source2target=False)
+    #raise ValueError("stop")
+    # T*source_target
+    opt.obj_opt_min_=np.mean(np.abs(y_mean_source))
+    #target_points_update, T_update=opt.step(target_points=target_surface.point_down,T_last=Transformation())
+    target_points_update, T_update=opt.step(target_points=target_surface.point_down,T_last=transform_target2source)
+    #print("T_update:\n",T_update)
+    transformation_update=Transformation()
+    transformation_update.Transform=T_update
+    target_points_update = opt.updateTarget_Point(target_surface.point, transformation_update)
+    if True:
+        Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transformation_update,source2target=False)
+    #target_PC=PointCloud()
+    #target_PC.point=target_points_update
+    #Registration.draw_registraion_init(source=source_surface,target=target_PC)
+    y_mean_3=gpisModel.prediction(target_points_update)
+    print("GT source 2 target transforma: \n", (transinit.Transform))
+    print("GT target 2 source transforma: \n", np.linalg.inv(transinit.Transform))
+    print("T_update:\n ",T_update)
+    print("update value: ",np.mean(np.abs(y_mean_3)))
 if __name__=="__main__":
     #test_se3() # checked
     #test_gpis_kernel() # checked

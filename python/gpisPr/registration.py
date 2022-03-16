@@ -18,6 +18,7 @@
 
 import os
 import sys
+from turtle import width
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
@@ -29,20 +30,23 @@ import transforms3d as t3d
 
 class Registration:
     @staticmethod
-    def draw_registration_result(source:PointCloud,target:PointCloud, transformation:Transformation):
+    def draw_registration_result(source:PointCloud,target:PointCloud, transformation:Transformation,source2target:True, window_name="Open3D",size=[1000,1000]):
         source_temp = copy.deepcopy(source)
         target_temp = copy.deepcopy(target)
         source_temp.pcd.paint_uniform_color([1, 0.706, 0])
         target_temp.pcd.paint_uniform_color([0, 0.651, 0.929])
-        source_temp.transform(transformation.Transform)
-        o3d.visualization.draw_geometries([source_temp.pcd, target_temp.pcd])
+        if source2target:
+            source_temp.transform(transformation.Transform)
+        else:
+            target_temp.transform(transformation.Transform)    
+        o3d.visualization.draw_geometries([source_temp.pcd, target_temp.pcd],window_name =window_name,width=size[0],height=size[1])
     @staticmethod
-    def draw_registraion_init(source:PointCloud,target:PointCloud):
+    def draw_registraion_init(source:PointCloud,target:PointCloud,window_name="Open3D",size=[1000,1000]):
         source_temp = copy.deepcopy(source)
         target_temp = copy.deepcopy(target)
         source_temp.pcd.paint_uniform_color([1, 0.706, 0])
         target_temp.pcd.paint_uniform_color([0, 0.651, 0.929])
-        o3d.visualization.draw_geometries([source_temp.pcd, target_temp.pcd])
+        o3d.visualization.draw_geometries([source_temp.pcd, target_temp.pcd],window_name =window_name,width=size[0],height=size[1])
     @staticmethod
     def ICP_init(source, target, max_distance_threshold, transinit):
         reg_p2p = o3d.pipelines.registration.registration_icp(source, target, max_distance_threshold,

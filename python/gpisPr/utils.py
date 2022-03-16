@@ -86,7 +86,7 @@ class Transformation:
         return self._T
 
     @Transform.setter
-    def T(self, v):
+    def Transform(self, v):
         self._T = v
 
 

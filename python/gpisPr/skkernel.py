@@ -26,9 +26,10 @@ from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.special import kv, gamma
 
 class SKWilliamsPlusKernel(Kernel):
-    def __init__(self, R):
+    def __init__(self, R,alpha=0.1):
         self.name = 'SKWilliamsPlusKernel'
         self.R = R
+        self.alpha=alpha
 
     def __call__(self, X, Y=None, eval_gradient=False):
         X = np.atleast_2d(X)
@@ -40,9 +41,7 @@ class SKWilliamsPlusKernel(Kernel):
             dist1 = 2*tmp1*d1+3*self.R * tmp1+tmp2
             # convert from upper-triangular matrix to square matrix
             K = squareform(dist1)
-            Y=np.sum(np.abs(K),axis=1)/X.shape[0]
-            print(Y)
-            np.fill_diagonal(K, tmp2+Y)
+            np.fill_diagonal(K, tmp2+self.alpha)
         else:
             if eval_gradient:
                 raise ValueError(
@@ -59,7 +58,7 @@ class SKWilliamsPlusKernel(Kernel):
             return K
     def gradient(self, X, Y):
         d1 = cdist(X, Y,metric='euclidean')
-        K_gradient=6*(d1-self.R)
+        K_gradient=6*(d1+self.R)
         return K_gradient
     def is_stationary(self):
         """Returns whether the kernel is stationary. """
@@ -69,7 +68,7 @@ class SKWilliamsPlusKernel(Kernel):
 
 
 class SKWilliamsMinusKernel(Kernel):
-    def __init__(self, R, alpha=0.1):
+    def __init__(self, R, alpha=0):
         self.name = 'SKWilliamsMinusKernel'
         self.R = R
         self.has_kxx=False
@@ -108,7 +107,7 @@ class SKWilliamsMinusKernel(Kernel):
             return K
     def gradient(self,X,Y):
         d1 = cdist(X, Y,metric='euclidean')
-        K_gradient=6*(d1-self.R)*d1
+        K_gradient=6*(d1-self.R)
         return K_gradient
     def is_stationary(self):
         """Returns whether the kernel is stationary. """
@@ -172,7 +171,7 @@ class SKRBF(RBF):
             return K
     def gradient(self,X,Y):
         dists = cdist(X / self.length_scale, Y / self.length_scale,metric='euclidean')
-        K_gradient=np.exp(-0.5 * np.power(dists,2))*-1*dists
+        K_gradient=np.exp(-0.5 * np.power(dists,2))*-1
         return K_gradient
 
 def _approx_fprime(xk, f, epsilon, args=()):
@@ -298,7 +297,7 @@ class SKMatern(Matern):
             tmp1=np.sqrt(3)
             tmp2 = dists * tmp1
             K_gradient=np.exp(-tmp2)*tmp1+(1.0 + tmp2) * np.exp(-tmp2)*(-1)*tmp1
-            return K_gradient
+            return K_gradient/dists
         if self.nu==2.5:
             tmp1=np.sqrt(5)
             K = dists * np.sqrt(5)
