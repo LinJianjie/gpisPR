@@ -78,6 +78,9 @@ class PointCloud:
     def size(self):
         return self.point.shape[0]
     @property
+    def size_down(self):
+        return self.point_down.shape[0]
+    @property
     def point(self):
         return PointCloud.pca2xyz(self._pcd)
     @property

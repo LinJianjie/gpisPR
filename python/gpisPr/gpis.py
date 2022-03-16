@@ -89,7 +89,9 @@ class GPISData:
     
     def voxel_points(self,voxel_size):
         self.voxel_size=voxel_size
-        self._surface_points_down.pcd=self.surface_points.voxel_down_sample(self.voxel_size)
+        while self._surface_points_down.size>2000:
+            self._surface_points_down.pcd=self.surface_points.voxel_down_sample(self.voxel_size)
+            self.voxel_size=self.voxel_size*1.1
     @property
     def surface_points(self):
         return self._surface_points

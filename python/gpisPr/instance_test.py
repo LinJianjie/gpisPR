@@ -120,14 +120,14 @@ def test_gpis():
 def test_gpisOpt():
     vis=True
     print("=====> Prepare the Point Cloud Data")
-    file_path=os.path.join(os.path.dirname(__file__),"../","data/bunny_1420.pcd")
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
     source_surface = PointCloud(filename=file_path)
     source_surface()
     source_surface.scale(scale_=1)
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
     transinit.trans = np.asarray([0.1, 0.2, 0.])
-    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(60.0), DEG2RAD(80.0), 'sxyz')
+    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(180.0), DEG2RAD(80.0), 'sxyz')
     transinit.rotation = rot
     target_surface.transform(transinit.Transform)
     if vis:
