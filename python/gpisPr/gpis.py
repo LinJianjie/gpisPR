@@ -192,10 +192,16 @@ class GPISOpt:
     def init(self, source: PointCloud = None, target: PointCloud = None):
         source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True)
         target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True)
-        transform_es = self.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
+        source_down_fpfh=PointCloud()
+        target_down_fpfh=PointCloud()
+        transform_es,source_down_fpfh_,target_down_fpfh_ = self.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
+        source_down_fpfh.point=source_down_fpfh_
+        target_down_fpfh.point=target_down_fpfh_
+        transform_target2source_list=[]
         transform_target2source=Transformation()
         transform_target2source.Transform=np.linalg.inv(transform_es.Transform)
-        return transform_target2source
+        transform_target2source_list.append(transform_target2source)
+        return transform_target2source_list,source_down_fpfh,target_down_fpfh
     def init4(self, source: PointCloud = None, target: PointCloud = None):
         source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True)
         target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True)
@@ -354,7 +360,7 @@ class GPISOpt:
         transform_es=Transformation()
         transform_es.rotation=R_es
         transform_es.trans=trans
-        return transform_es
+        return transform_es,source_down_fpfh,target_down_fpfh
 
 
 if __name__ == '__main__':

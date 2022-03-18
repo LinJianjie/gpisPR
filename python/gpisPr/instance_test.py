@@ -224,7 +224,7 @@ def gpisOptDemo():
     source_surface.scale(scale_=1)
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
-    transinit.setT(trans=np.asarray([0., 0., 0.]),rot_deg=[0,90,0])
+    transinit.setT(trans=np.asarray([0.2, 0., 0.]),rot_deg=[90,85,0])
     target_surface.transform(transinit.Transform)
     if True:
         Registration.draw_registraion_init(source=source_surface,target=target_surface)
@@ -232,38 +232,48 @@ def gpisOptDemo():
     print("=====> Set Up GPIS Opt")
     opt = GPISOpt()
     print("=====> Begin GPIS PCA init ")
-    transform_target2source, source_down_fpfh, target_down_fpfh=opt.init4(source_surface,target_surface)
+    transform_target2source, source_down_fpfh, target_down_fpfh=opt.init(source_surface,target_surface)
 
     print("====> Set Up GPIS model")
-    gpisData=GPISData(surface_points=source_down_fpfh,num_in_out_lier=1000,has_in_lier=False)
+    gpisData=GPISData(surface_points=source_down_fpfh,num_in_out_lier=50,has_in_lier=False)
     gpisData()
     print("gpisData.X_source: ",gpisData.X_source.shape)
     print("gpisData.maxR: ",gpisData.maxR)
 
     print("====> Prepare the GPIS Model")
-    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0.01), random_state=0)
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0), random_state=0)
     gpisModel.fit(gpisData.X_source, gpisData.Y_source)
     y_mean_source=gpisModel.prediction(source_down_fpfh.point)
     print("source: ", y_mean_source)
     y_mean_1=gpisModel.prediction(target_down_fpfh.point)
     print("original target: ",y_mean_1)
 
-    print("===>evaluate the init solution")
+    print("===>evaluate the init solution") # affects by the num_in_out_lier
     init_predict=[]
     for transform_target2source_ in transform_target2source:
         target_points_init = opt.updateTarget_Point(target_down_fpfh.point, transform_target2source_)
         y_mean_init=gpisModel.prediction(target_points_init)
         init_predict.append(y_mean_init)
+    print("init predict: ",init_predict)
     init_predict=np.abs(np.asarray(init_predict)-y_mean_source)
     indx=np.argmin(init_predict)
-    print("PCA init at ",indx," is chosen")
     if vis:
         Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_target2source[indx],source2target=False)
-    visAll=True
+    visAll=False
     if visAll:
-        for i in range(4):
-            Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_target2source[i],source2target=False)
-
+        for transform_t2s in transform_target2source:
+            Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_t2s,source2target=False)
+    print("====> start to optimization")
+    opt.gpisModel=gpisModel
+    opt.obj_opt_min=0
+    #target_points_update, T_update=opt.step(target_points=target_down_fpfh.point,T_last=Transformation())
+    target_points_update, T_update=opt.step(target_points=target_down_fpfh.point,T_last=transform_target2source[indx])
+    #print("T_update:\n",T_update)
+    transformation_update=Transformation()
+    transformation_update.Transform=T_update
+    #target_points_update = opt.updateTarget_Point(target_surface.point, transformation_update)
+    if True:
+        Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transformation_update,source2target=False)
 if __name__=="__main__":
     #test_se3() # checked
     #test_gpis_kernel() # checked
