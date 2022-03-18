@@ -123,68 +123,151 @@ def test_gpisOpt():
     file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
     source_surface = PointCloud(filename=file_path)
     source_surface()
+    # TODO, check the scale, und rescale, using the bounding box
     source_surface.scale(scale_=1)
+    #raise ValueError("stop")
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
-    transinit.trans = np.asarray([0.1, 0.2, 0.])
-    rot = t3d.euler.euler2mat(DEG2RAD(50.0), DEG2RAD(180.0), DEG2RAD(80.0), 'sxyz')
+    transinit.trans = np.asarray([0, 0, 0.])
+    rot = t3d.euler.euler2mat(DEG2RAD(90.0), DEG2RAD(180.0), DEG2RAD(0.0), 'sxyz')
     transinit.rotation = rot
     target_surface.transform(transinit.Transform)
-    if vis:
+    if True:
         Registration.draw_registraion_init(source=source_surface,target=target_surface)
 
     # prepera the GPIS Data
     print("=====> Prepare the GPIS Data")
-    voxel_size=0.001
-    gpisData=GPISData(surface_points=source_surface,num_in_out_lier=500,has_in_lier=True)
+    voxel_size=0.0001
+    gpisData=GPISData(surface_points=source_surface,num_in_out_lier=1000,has_in_lier=False)
     gpisData.voxel_points(voxel_size)
     gpisData()
+    #Registration.draw_registraion_init(source=gpisData.in_lier_PC,target=gpisData.out_lier_PC)
+    #raise ValueError("Stop")
     print("gpisData.X_source: ",gpisData.X_source.shape)
-    target_surface.voxel_down_sample(voxel_size=voxel_size,inline=True)
-    source_surface.voxel_down_sample(voxel_size=voxel_size,inline=True)
+    target_surface.voxel_down_sample(voxel_size=gpisData.voxel_size,inline=True)
+    source_surface.voxel_down_sample(voxel_size=gpisData.voxel_size,inline=True)
+
+
     print("====> Prepare the GPIS Model")
     print("gpisData.maxR: ",gpisData.maxR)
     #gpisModel = GPISModel(kernel=SKWilliamsPlusKernel(R=gpisData.maxR,alpha=0.1), random_state=0)
-    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0.1), random_state=0)
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0.01), random_state=0)
     #gpisModel=GPISModel(kernel=SKRBF(length_scale=1,length_scale_bounds="fixed"), random_state=0)
     #gpisModel = GPISModel(kernel=SKMatern(length_scale=10,length_scale_bounds="fixed",nu=1.5), random_state=0)
     gpisModel.fit(gpisData.X_source, gpisData.Y_source)
-    y_mean_source=gpisModel.prediction(source_surface.point)
-    print("source: ",np.mean(np.abs(y_mean_source)))
+    y_mean_source=gpisModel.prediction(source_surface.point_down)
+    print("source: ",y_mean_source)
     y_mean_1=gpisModel.prediction(target_surface.point_down)
-    print("original target: ",np.mean(np.abs(y_mean_1)))
+    print("original target: ",y_mean_1)
 
     print("=====> start to optimiztion")
-    opt = GPISOpt(voxel_size=voxel_size,gpisModel=gpisModel)
-    transform_target2source=opt.init(source_surface,target_surface)
-    print("transform_target2source:\n ",transform_target2source.Transform)
-    target_points_init = opt.updateTarget_Point(target_surface.point, transform_target2source)
-    y_mean_2=gpisModel.prediction(target_points_init)
-    print("init target: ",np.mean(np.abs(y_mean_2)))
-    if vis:
-        Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_target2source,source2target=False)
-    #raise ValueError("stop")
+
+    opt = GPISOpt(voxel_size=voxel_size)
+    opt.gpisModel=gpisModel
+
+    #transform_target2source=opt.init(source_surface,target_surface)
+    transform_target2source,_,_=opt.init4(source_surface,target_surface)
+    #print("transform_target2source:\n ",transform_target2source.Transform)
+    init_target_value=[]
+    for i in range(4):
+        target_points_init = opt.updateTarget_Point(target_surface.point_down, transform_target2source[i])
+        y_mean_2=gpisModel.prediction(target_points_init)
+        print("init target: ",y_mean_2)
+        if vis:
+            Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_target2source[i],source2target=False)
+    raise ValueError("stop")
     # T*source_target
-    opt.obj_opt_min_=np.mean(np.abs(y_mean_source))
-    #target_points_update, T_update=opt.step(target_points=target_surface.point_down,T_last=Transformation())
-    target_points_update, T_update=opt.step(target_points=target_surface.point_down,T_last=transform_target2source)
+    opt.obj_opt_min_=y_mean_source
+
+    print(" start with ICP init")
+    icp_transformation=Registration.ICP_init(source=source_surface._pcd_down,target=target_surface._pcd_down,max_distance_threshold=1,transinit=transform_target2source.Transform)
+    if vis:
+        ICP_transformation=Transformation()
+        ICP_transformation.Transform=icp_transformation
+        Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=ICP_transformation,source2target=True)
+
+    #raise ValueError("stop")
+
+    target_points_update, T_update=opt.step(target_points=target_surface.point_down,T_last=Transformation())
+    #target_points_update, T_update=opt.step(target_points=target_surface.point_down,T_last=transform_target2source)
     #print("T_update:\n",T_update)
     transformation_update=Transformation()
     transformation_update.Transform=T_update
-    target_points_update = opt.updateTarget_Point(target_surface.point, transformation_update)
+    #target_points_update = opt.updateTarget_Point(target_surface.point, transformation_update)
     if True:
         Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transformation_update,source2target=False)
+
+    if False:
+        print(" conitinous with ICP init")
+        icp_transformation_update=Registration.ICP_init(source=source_surface._pcd_down,target=target_surface._pcd_down,max_distance_threshold=10,transinit=np.linalg.inv(T_update))
+        if vis:
+            ICP_transformation=Transformation()
+            ICP_transformation.Transform=icp_transformation_update
+            Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=ICP_transformation,source2target=True)
+
     #target_PC=PointCloud()
     #target_PC.point=target_points_update
     #Registration.draw_registraion_init(source=source_surface,target=target_PC)
-    y_mean_3=gpisModel.prediction(target_points_update)
-    print("GT source 2 target transforma: \n", (transinit.Transform))
-    print("GT target 2 source transforma: \n", np.linalg.inv(transinit.Transform))
-    print("T_update:\n ",T_update)
-    print("update value: ",np.mean(np.abs(y_mean_3)))
+    #y_mean_3=gpisModel.prediction(target_points_update)
+    #print("GT source 2 target transforma: \n", (transinit.Transform))
+    #print("GT target 2 source transforma: \n", np.linalg.inv(transinit.Transform))
+    #print("T_update:\n ",T_update)
+    #print("update value: ",np.mean(np.abs(y_mean_3)))
+
+def gpisOptDemo():
+    vis=True
+    print("=====> Prepare the Point Cloud Data")
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
+    source_surface = PointCloud(filename=file_path)
+    source_surface()
+    # TODO, check the scale, und rescale, using the bounding box
+    source_surface.scale(scale_=1)
+    target_surface=copy.deepcopy(source_surface)
+    transinit = Transformation()
+    transinit.setT(trans=np.asarray([0., 0., 0.]),rot_deg=[0,90,0])
+    target_surface.transform(transinit.Transform)
+    if True:
+        Registration.draw_registraion_init(source=source_surface,target=target_surface)
+
+    print("=====> Set Up GPIS Opt")
+    opt = GPISOpt()
+    print("=====> Begin GPIS PCA init ")
+    transform_target2source, source_down_fpfh, target_down_fpfh=opt.init4(source_surface,target_surface)
+
+    print("====> Set Up GPIS model")
+    gpisData=GPISData(surface_points=source_down_fpfh,num_in_out_lier=1000,has_in_lier=False)
+    gpisData()
+    print("gpisData.X_source: ",gpisData.X_source.shape)
+    print("gpisData.maxR: ",gpisData.maxR)
+
+    print("====> Prepare the GPIS Model")
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0.01), random_state=0)
+    gpisModel.fit(gpisData.X_source, gpisData.Y_source)
+    y_mean_source=gpisModel.prediction(source_down_fpfh.point)
+    print("source: ", y_mean_source)
+    y_mean_1=gpisModel.prediction(target_down_fpfh.point)
+    print("original target: ",y_mean_1)
+
+    print("===>evaluate the init solution")
+    init_predict=[]
+    for transform_target2source_ in transform_target2source:
+        target_points_init = opt.updateTarget_Point(target_down_fpfh.point, transform_target2source_)
+        y_mean_init=gpisModel.prediction(target_points_init)
+        init_predict.append(y_mean_init)
+    init_predict=np.abs(np.asarray(init_predict)-y_mean_source)
+    indx=np.argmin(init_predict)
+    print("PCA init at ",indx," is chosen")
+    if vis:
+        Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_target2source[indx],source2target=False)
+    visAll=True
+    if visAll:
+        for i in range(4):
+            Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_target2source[i],source2target=False)
+
 if __name__=="__main__":
     #test_se3() # checked
     #test_gpis_kernel() # checked
     #test_optimization()
     #test_gpis()
-    test_gpisOpt()
+    #test_gpisOpt()
+    gpisOptDemo()

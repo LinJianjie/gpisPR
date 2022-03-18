@@ -83,12 +83,15 @@ class PointCloud:
     @property
     def point(self):
         return PointCloud.pca2xyz(self._pcd)
-    @property
-    def point_down(self):
-        return PointCloud.pca2xyz(self._pcd_down)
     @point.setter
     def point(self, v):
         self._pcd = PointCloud.xyz2pcd(v)
+        if self.size_down==0:
+            self._pcd_down=self._pcd
+    @property
+    def point_down(self):
+        return PointCloud.pca2xyz(self._pcd_down)
+    
 
     @property
     def pcd(self):
@@ -97,7 +100,12 @@ class PointCloud:
     @pcd.setter
     def pcd(self, v):
         self._pcd = v
-
+    @property
+    def pcd_down(self):
+        return self._pcd_down
+    @pcd_down.setter
+    def pcd_down(self,v):
+        self._pcd_down=v
     @property
     def path(self):
         return self._path
@@ -106,7 +114,7 @@ class PointCloud:
         self.voxel_size=voxel_size
         pcd_down = self._pcd.voxel_down_sample(self.voxel_size)
         if inline:
-            self._pcd_down=pcd_down
+            self.pcd_down=pcd_down
         else:
             if toNumpy:
                 return PointCloud.pca2xyz(pcd_down)
@@ -114,8 +122,8 @@ class PointCloud:
 
     def compute_fpfh(self,pcd_down,toNumpy=False):
         if not pcd_down.has_normals:
-            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 2.0,
-                                                                       max_nn=30))
+            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 5.0,
+                                                                       max_nn=100))
         pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_down,
                                                                    o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 5.0,
                                                                                                         max_nn=100))
@@ -124,7 +132,13 @@ class PointCloud:
         return pcd_fpfh                      
                                                                                    
     def preprocess_point_cloud(self, voxel_size, toNumpy=False):
-        pcd_down = self.voxel_down_sample(voxel_size)
+        if self.size>10000:
+            self.pcd_down=self._pcd
+            while self.size_down > 10000:
+                self.voxel_down_sample(voxel_size,inline=True)
+                voxel_size=voxel_size*1.01
+        print(self.size_down)
+        pcd_down=self.pcd_down
         pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size * 2.0,
                                                                        max_nn=30))
         pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_down,

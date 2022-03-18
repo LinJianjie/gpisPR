@@ -20,9 +20,10 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import cKDTree,KDTree
 from sklearn.decomposition import PCA
-
+import time 
+import transforms3d as t3d
 
 def DEG2RAD(deg):
     return deg*np.pi/180
@@ -33,8 +34,8 @@ def RAD2DEG(rad):
 
 
 def find_knn(feat0, feat1, knn=1, return_distance=False):
-    feat1tree = cKDTree(feat1)
-    dists, nn_inds = feat1tree.query(feat0, k=knn, n_jobs=-1)
+    feat1tree = cKDTree(feat1,balanced_tree=False,compact_nodes=False)
+    dists, nn_inds = feat1tree.query(feat0, k=knn, workers=8) # find the nn_ids from the feat 1
     if return_distance:
         return nn_inds, dists
     else:
@@ -43,16 +44,17 @@ def find_knn(feat0, feat1, knn=1, return_distance=False):
 
 def find_correspondences(feats0, feats1, mutual_filter=True):
     # the feats1 to feats0
-    nns01 = find_knn(feats0, feats1, knn=1, return_distance=False)
-    corres01_idx0 = np.arange(len(nns01))
-    corres01_idx1 = nns01
+    start=time.time()
+    nns0_to_1 = find_knn(feats0, feats1, knn=1, return_distance=False) # index of feats1 for each feats0
+    corres01_idx0 = np.arange(len(nns0_to_1)) # The length of feats 0
+    corres01_idx1 = nns0_to_1 # index of feats 1
 
     if not mutual_filter:
         return corres01_idx0, corres01_idx1
 
-    nns10 = find_knn(feats1, feats0, knn=1, return_distance=False)
-    corres10_idx1 = np.arange(len(nns10))
-    corres10_idx0 = nns10
+    nns1_to_0 = find_knn(feats1, feats0, knn=1, return_distance=False) # index of feats0 for each feats1
+    corres10_idx1 = np.arange(len(nns1_to_0))
+    corres10_idx0 = nns1_to_0
 
     mutual_filter = (corres10_idx0[corres01_idx1] == corres01_idx0)
     corres_idx0 = corres01_idx0[mutual_filter]
@@ -64,7 +66,9 @@ def find_correspondences(feats0, feats1, mutual_filter=True):
 class Transformation:
     def __init__(self) -> None:
         self._T = np.identity(4)
-
+    def setT(self,trans,rot_deg):
+        self.rotation = t3d.euler.euler2mat(DEG2RAD(rot_deg[0]), DEG2RAD(rot_deg[1]), DEG2RAD(rot_deg[2]), 'sxyz')
+        self.trans=trans
     @property
     def trans(self):
         return self._T[:3, 3]
@@ -99,14 +103,12 @@ def getRightHandCoordinate(v1, v2, v3):
 
 def getAllRightHandCoordinate(R):
     R_list = []
-    R_list.append(getRightHandCoordinate(R[:,0], R[:,1], R[:,2]))
-    R_list.append(getRightHandCoordinate(R[:,0], R[:,2], R[:,1]))
+    right_hand=getRightHandCoordinate(R[:,0], R[:,1], R[:,2])
+    R_list.append(np.asarray([right_hand[:,0],right_hand[:,1],right_hand[:,2]]))
+    R_list.append(np.asarray([-right_hand[:,0],-right_hand[:,1],right_hand[:,2]]))
 
-    R_list.append(getRightHandCoordinate(R[:,1], R[:,0], R[:,2]))
-    R_list.append(getRightHandCoordinate(R[:,1], R[:,2], R[:,0]))
-
-    R_list.append(getRightHandCoordinate(R[:,2], R[:,1], R[:,0]))
-    R_list.append(getRightHandCoordinate(R[:,2], R[:,0], R[:,1]))
+    R_list.append(np.asarray([right_hand[:,0],-right_hand[:,1],-right_hand[:,2]]))
+    R_list.append(np.asarray([-right_hand[:,0],right_hand[:,1],-right_hand[:,2]]))
     return R_list
 
 
@@ -115,6 +117,7 @@ def get_PCA_eigen_vector(pointXYZ):
     pca = PCA(n_components=3)
     pca.fit(pointXYZ)
     pca_eigen_vector = pca.components_.T
+    #print("singular_values: ",pca.singular_values_)
     return pca_eigen_vector
 
 
