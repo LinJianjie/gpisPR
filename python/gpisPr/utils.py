@@ -23,6 +23,7 @@ import numpy as np
 from scipy.spatial import cKDTree,KDTree
 from sklearn.decomposition import PCA
 import time 
+import open3d as o3d
 import transforms3d as t3d
 
 def DEG2RAD(deg):
@@ -35,15 +36,23 @@ def RAD2DEG(rad):
 
 def find_knn(feat0, feat1, knn=1, return_distance=False):
     feat1tree = cKDTree(feat1,balanced_tree=False,compact_nodes=False)
-    dists, nn_inds = feat1tree.query(feat0, k=knn, workers=8) # find the nn_ids from the feat 1
+    dists, nn_inds = feat1tree.query(feat0, k=knn, workers=-1) # find the nn_ids from the feat 1
     if return_distance:
         return nn_inds, dists
     else:
         return nn_inds
-
+def find_knn_open3d(feat0, feat1,knn=1):
+    feat1_fpfh=o3d.pipelines.registration.Feature()
+    feat1_fpfh.data=feat0.T
+    fpfh_tree_1=o3d.geometry.KDTreeFlann(feat1_fpfh)
+    feat0_fpfh=o3d.pipelines.registration.Feature()
+    feat0_fpfh.data=feat1.T
+    _,indx,dis=fpfh_tree_1.search_knn_vector_xd(feat0_fpfh.data[:,0].reshape(33,1),knn=1)
+    print(indx[0])
 
 def find_correspondences(feats0, feats1, mutual_filter=True):
     # the feats1 to feats0
+    #find_knn_open3d(feat0=feats0,feat1=feats1)
     start=time.time()
     nns0_to_1 = find_knn(feats0, feats1, knn=1, return_distance=False) # index of feats1 for each feats0
     corres01_idx0 = np.arange(len(nns0_to_1)) # The length of feats 0

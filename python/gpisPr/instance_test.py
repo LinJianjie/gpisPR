@@ -120,7 +120,7 @@ def test_gpis():
 def test_gpisOpt():
     vis=True
     print("=====> Prepare the Point Cloud Data")
-    file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/moneky_6450.pcd")
     source_surface = PointCloud(filename=file_path)
     source_surface()
     # TODO, check the scale, und rescale, using the bounding box
@@ -217,14 +217,14 @@ def test_gpisOpt():
 def gpisOptDemo():
     vis=True
     print("=====> Prepare the Point Cloud Data")
-    file_path=os.path.join(os.path.dirname(__file__),"../","data/happy.pcd")
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/monkey.pcd")
     source_surface = PointCloud(filename=file_path)
     source_surface()
     # TODO, check the scale, und rescale, using the bounding box
     source_surface.scale(scale_=1)
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
-    transinit.setT(trans=np.asarray([0.2, 0., 0.]),rot_deg=[90,85,0])
+    transinit.setT(trans=np.asarray([0.02, 0., 0.]),rot_deg=[90,180,0])
     target_surface.transform(transinit.Transform)
     if True:
         Registration.draw_registraion_init(source=source_surface,target=target_surface)
@@ -241,7 +241,7 @@ def gpisOptDemo():
     print("gpisData.maxR: ",gpisData.maxR)
 
     print("====> Prepare the GPIS Model")
-    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0), random_state=0)
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0.5), random_state=0)
     gpisModel.fit(gpisData.X_source, gpisData.Y_source)
     y_mean_source=gpisModel.prediction(source_down_fpfh.point)
     print("source: ", y_mean_source)
@@ -265,7 +265,7 @@ def gpisOptDemo():
             Registration.draw_registration_result(source=source_surface,target=target_surface,transformation=transform_t2s,source2target=False)
     print("====> start to optimization")
     opt.gpisModel=gpisModel
-    opt.obj_opt_min=0
+    opt.obj_opt_min=y_mean_source
     #target_points_update, T_update=opt.step(target_points=target_down_fpfh.point,T_last=Transformation())
     target_points_update, T_update=opt.step(target_points=target_down_fpfh.point,T_last=transform_target2source[indx])
     #print("T_update:\n",T_update)

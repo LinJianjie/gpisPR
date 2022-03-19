@@ -114,7 +114,10 @@ class GPISData:
     def compute_max_radius(self):
         radius = pdist(self.X_source, metric="euclidean")
         self._R = np.max(radius)
-    
+    @property
+    def minR(self):
+        radius = pdist(self.X_source, metric="euclidean")
+        return np.min(radius)
 class GPISModel(GaussianProcessRegressor):
     def __init__(self, kernel=None, *, alpha=0.2,
                  optimizer="fmin_l_bfgs_b", n_restarts_optimizer=0,
@@ -190,8 +193,8 @@ class GPISOpt:
         return new_objective<self.obj_last
         
     def init(self, source: PointCloud = None, target: PointCloud = None):
-        source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True)
-        target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True)
+        source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True,kdhyper=True)
+        target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True,kdhyper=True)
         source_down_fpfh=PointCloud()
         target_down_fpfh=PointCloud()
         transform_es,source_down_fpfh_,target_down_fpfh_ = self.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
@@ -344,7 +347,8 @@ class GPISOpt:
         corres_idx0, corres_idx1 = find_correspondences(source_fpfh, target_fpfh)
         source_down_fpfh = source_down[corres_idx0, :]
         target_down_fpfh = target_down[corres_idx1, :]
-
+        print("corresponding source points: ",source_down_fpfh.shape)
+        print("corresponding target points: ",source_down_fpfh.shape)
         source_pca_vectors=get_PCA_eigen_vector(source_down_fpfh)
         R_source=getRightHandCoordinate(source_pca_vectors[:,0],source_pca_vectors[:,1],source_pca_vectors[:,2])
 
