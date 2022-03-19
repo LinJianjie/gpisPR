@@ -197,7 +197,7 @@ class PointCloud:
                 #print("down_sampling: ",self.size_down)
                 #raise ValueError("stop")
             else:
-                voxel_size=0.01 # TODO how to get the propery voxel
+                voxel_size=0.0001 # TODO how to get the propery voxel
         print("size of down: ",self.size_down)
         pcd_down=self.pcd_down
         if kdhyper:

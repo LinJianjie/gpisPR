@@ -217,7 +217,7 @@ def test_gpisOpt():
 def gpisOptDemo():
     vis=True
     print("=====> Prepare the Point Cloud Data")
-    file_path=os.path.join(os.path.dirname(__file__),"../","data/monkey.pcd")
+    file_path=os.path.join(os.path.dirname(__file__),"../","data/bunny_1420.pcd")
     source_surface = PointCloud(filename=file_path)
     source_surface()
     # TODO, check the scale, und rescale, using the bounding box
@@ -241,7 +241,7 @@ def gpisOptDemo():
     print("gpisData.maxR: ",gpisData.maxR)
 
     print("====> Prepare the GPIS Model")
-    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0.5), random_state=0)
+    gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(R=gpisData.maxR,alpha=0), random_state=0)
     gpisModel.fit(gpisData.X_source, gpisData.Y_source)
     y_mean_source=gpisModel.prediction(source_down_fpfh.point)
     print("source: ", y_mean_source)
