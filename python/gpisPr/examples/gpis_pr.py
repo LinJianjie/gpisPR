@@ -12,7 +12,7 @@ from gpisPr.pointCloud import PointCloud
 from gpisPr.registration import Registration
 
 def gpisOptDemo():
-    gpisPrOptions=GPISPrOptions(gpis_alpha=0,voxel_size=0.0001,num_in_out_lier=50)
+    gpisPrOptions=GPISPrOptions(gpis_alpha=0,voxel_size=0.0001,num_in_out_lier=150,use_init4=True)
     vis=True
     print("=====> Prepare the Point Cloud Data")
     file_path=os.path.join(os.path.dirname(__file__),"../../","data/bunny_1420.pcd")
@@ -21,7 +21,7 @@ def gpisOptDemo():
     source_surface.scale(scale_=1)
     target_surface=copy.deepcopy(source_surface)
     transinit = Transformation()
-    transinit.setT(trans=np.asarray([0.02, 0., 0.]),rot_deg=[90,90,0])
+    transinit.setT(trans=np.asarray([0.0, 0., 0.]),rot_deg=[0,0,90])
     target_surface.transform(transinit.Transform)
     if True:
         Registration.draw_registraion_init(source=source_surface,target=target_surface)
@@ -29,7 +29,10 @@ def gpisOptDemo():
     print("=====> Set Up GPIS Opt")
     opt = GPISOpt(voxel_size=gpisPrOptions.voxel_size)
     print("=====> Begin GPIS PCA init ")
-    transform_target2source, source_down_fpfh, target_down_fpfh=opt.init(source_surface,target_surface)
+    if gpisPrOptions.use_init4:
+        transform_target2source, source_down_fpfh, target_down_fpfh=opt.init4(source_surface,target_surface)
+    else:
+        transform_target2source, source_down_fpfh, target_down_fpfh=opt.init(source_surface,target_surface)
 
     print("====> Set Up GPIS model")
     gpisData=GPISData(surface_points=source_down_fpfh,num_in_out_lier=gpisPrOptions.num_in_out_lier,has_in_lier=False)
@@ -61,7 +64,7 @@ def gpisOptDemo():
     print("====> start to optimization")
     opt.gpisModel=gpisModel
     opt.obj_opt_min=y_mean_source
-    #target_points_update, T_update=opt.step(target_points=target_down_fpfh.point,T_last=Transformation())
+    #target_points_update, T_update=opt.execute_gpis_point_registration(target_points=target_down_fpfh.point,T_last=Transformation())
     _,T_update=opt.execute_gpis_point_registration(target_points=target_down_fpfh.point,T_last=transform_target2source[indx])
     transformation_update=Transformation()
     transformation_update.Transform=T_update

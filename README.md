@@ -15,6 +15,7 @@ more details please refers to our paper
 ### running the demo
 1. voxel size for the objects should be set
 2. the alpha in the GPIS should be tunned for enable an psd convariance matrix
+3. use_init4 parameter is try to solve the PCA sign ambitious problem. In the default, the first init is chosen. but in some cases, PCA can not result in a correct initial alignment. Then you may need to enable the init4 options to chose the correct sign
 
 ### Lie Algebra
 1. we use the [Lie algebra libray](https://github.com/utiasSTARS/liegroups) to express lie operator 

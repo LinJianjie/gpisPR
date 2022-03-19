@@ -35,10 +35,11 @@ import time
 from gpisPr.registration import Registration
 
 class GPISPrOptions:
-    def __init__(self,gpis_alpha=0, voxel_size=0.0001,num_in_out_lier=50) -> None:
+    def __init__(self,gpis_alpha=0, voxel_size=0.0001,num_in_out_lier=50,use_init4=False) -> None:
         self.gpis_alpha_=gpis_alpha
         self.voxel_size_=voxel_size
         self.num_in_out_lier_=num_in_out_lier
+        self.use_init4_=use_init4
     @property
     def gpis_alpha(self):
         return self.gpis_alpha_
@@ -48,6 +49,9 @@ class GPISPrOptions:
     @property
     def num_in_out_lier(self):
         return self.num_in_out_lier_
+    @property
+    def use_init4(self):
+        return self.use_init4_
 class GPISData:
     def __init__(self,surface_points,num_in_out_lier=1000,has_in_lier=False) -> None:
         self._surface_points=copy.deepcopy(surface_points)
