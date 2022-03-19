@@ -16,8 +16,12 @@ more details please refers to our paper
 1. voxel size for the objects should be set
 2. the alpha in the GPIS should be tunned for enable an psd convariance matrix
 
+### Lie Algebra
+1. we use the [Lie algebra libray](https://github.com/utiasSTARS/liegroups) to express lie operator 
 ### Limitations
 1. Due to the complexity of Gaussian Process, the number of Point cloud shoud not be very bigger. It will be suggested aroundg 2000-3000 way points    
+2. the outer linr generation is depends on the modified [Mesh2SDF](https://github.com/marian42/mesh_to_sdf), sometime, it will results in a bad distribution. Then, please try to regenerate a new distribution of out lier points
+
 
 ### Citation
 If you find our work useful for your research, please cite:
