@@ -18,14 +18,12 @@
 
 import os
 import sys
-from turtle import width
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 import open3d as o3d
 import copy
-from pointCloud import PointCloud
-from utils import *
+from gpisPr.pointCloud import PointCloud
+from gpisPr.utils import *
 import transforms3d as t3d
 
 class Registration:

@@ -15,12 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with python.  If not, see <http://www.gnu.org/licenses/>.
 
-
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 import numpy as np
 import math
 from sklearn.neighbors import KDTree
 import open3d as o3d
-from pointCloud import PointCloud
+from gpisPr.pointCloud import PointCloud
 
 
 def sample_uniform_points_in_unit_sphere(amount):

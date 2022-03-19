@@ -15,11 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with python.  If not, see <http://www.gnu.org/licenses/>.
 
-from dis import dis
 import os
 import sys
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 import numpy as np
 from sklearn.gaussian_process.kernels import Kernel,RBF,Matern
 from scipy.spatial.distance import pdist, cdist, squareform

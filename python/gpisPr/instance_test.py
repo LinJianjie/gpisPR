@@ -17,9 +17,6 @@
 
 
 import copy
-from matplotlib.transforms import Transform
-
-from numpy import source
 from  liegroups import SE3
 from utils import *
 import transforms3d as t3d
@@ -45,13 +42,6 @@ def test_se3():
     odot33 = SE3.odot(p33)
     print(odot33.shape)
 
-def test_gpis_kernel():
-    X_source = np.random.rand(100, 3)
-    y_source = np.random.rand(100, 1)
-    X_target=np.random.rand(10, 3)
-    gpis = GPISModel(kernel=SKWilliamsMinusKernel(3), random_state=0)
-    K_gradient=gpis.Kernel.gradient(X_source,X_target)
-    print(K_gradient.shape)
 
 def test_optimization():
     gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(3), random_state=0)
@@ -267,7 +257,7 @@ def gpisOptDemo():
     opt.gpisModel=gpisModel
     opt.obj_opt_min=y_mean_source
     #target_points_update, T_update=opt.step(target_points=target_down_fpfh.point,T_last=Transformation())
-    target_points_update, T_update=opt.step(target_points=target_down_fpfh.point,T_last=transform_target2source[indx])
+    target_points_update, T_update=opt.execute_gpis_point_registration(target_points=target_down_fpfh.point,T_last=transform_target2source[indx])
     #print("T_update:\n",T_update)
     transformation_update=Transformation()
     transformation_update.Transform=T_update

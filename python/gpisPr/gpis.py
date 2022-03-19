@@ -14,27 +14,40 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with python.  If not, see <http://www.gnu.org/licenses/>.
-
-from pointCloud import PointCloud
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+from gpisPr.pointCloud import PointCloud
 import numpy as np
-from skkernel import SKWilliamsMinusKernel
+from gpisPr.skkernel import SKWilliamsMinusKernel
 from sklearn.gaussian_process import GaussianProcessRegressor
 from scipy.spatial.distance import pdist
 from sklearn.preprocessing import normalize
-from point2SDF import Point2SDF
-from liegroups import SE3
+from gpisPr.point2SDF import Point2SDF
+from gpisPr.liegroups import SE3
 import transforms3d as t3d
 import tqdm
-from utils import *
+from gpisPr.utils import *
 from scipy.linalg import cho_factor, cho_solve
 import copy
-import os
-import sys
+
 import time 
-from registration import Registration
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+from gpisPr.registration import Registration
 
-
+class GPISPrOptions:
+    def __init__(self,gpis_alpha=0, voxel_size=0.0001,num_in_out_lier=50) -> None:
+        self.gpis_alpha_=gpis_alpha
+        self.voxel_size_=voxel_size
+        self.num_in_out_lier_=num_in_out_lier
+    @property
+    def gpis_alpha(self):
+        return self.gpis_alpha_
+    @property
+    def voxel_size(self):
+        return self.voxel_size_
+    @property
+    def num_in_out_lier(self):
+        return self.num_in_out_lier_
 class GPISData:
     def __init__(self,surface_points,num_in_out_lier=1000,has_in_lier=False) -> None:
         self._surface_points=copy.deepcopy(surface_points)
@@ -163,16 +176,13 @@ class GPISModel(GaussianProcessRegressor):
         self._X_target = v
 
 class GPISOpt:
-    def __init__(self):
+    def __init__(self,voxel_size=0.0001):
         self._gpisModel = None
-        self.voxel_size = 0.0001
-        self.sumofDetla = 0
+        self.voxel_size = voxel_size
         self.T_last = Transformation()
         self.obj_value=10000
         self.obj_opt_min_=0
-        self.obj_last=1000000
         self.l=0.01
-        self.stop_condition=0.0001
         self.max_iteration=30
     @property
     def gpisModel(self):
@@ -219,19 +229,8 @@ class GPISOpt:
             transform_target2source.Transform=np.linalg.inv(transform_es[i].Transform)
             transform_target2source_list.append(transform_target2source)
         return transform_target2source_list,source_down_fpfh,target_down_fpfh
-    def execute(self,source: PointCloud = None, target: PointCloud = None):
-        iteration_step=0
-        transinit=self.init(source=source,target=target)
-        self.T_last=transinit
-        while np.abs(self.obj_last-self.obj_opt_min_)>self.stop_condition:
-            target_points_update, self.T_last=self.step(target_points=target,T_last=self.T_last)
-            obj_update_value=self.objective(target_points=target_points_update)
-            self.obj_last=obj_update_value
-            iteration_step=iteration_step+1
-            if iteration_step>self.max_iteration:
-                break
         
-    def step(self, target_points, T_last: Transformation = None):
+    def execute_gpis_point_registration(self, target_points, T_last: Transformation = None):
         print("T_last:\n ",T_last.Transform)
         T_check=copy.deepcopy(T_last)
         J_last=1000
@@ -285,12 +284,9 @@ class GPISOpt:
         #betaalpha = np.sum(BetaM@Alpha,axis=0).reshape(-1,1)
         betaalpha=BetaM@Alpha
         Alpha2=np.tile(np.expand_dims(Alpha,axis=0),(N,1,1))
-        print("DeltaM: ",DeltaM.shape)
         DeltaMAlpha = np.transpose(np.transpose(Alpha2,(0,2,1))@DeltaM,(0,2,1))
-        print("DeltaMAlpha: ",DeltaMAlpha.shape)
         JTJ = np.sum(DeltaMAlpha@DeltaMAlpha.reshape(N,1,6),axis=0) # 6\times 6
         JTr = np.sum(DeltaMAlpha@np.expand_dims(betaalpha,axis=1),axis=0) # 6 \times 1
-        #raise ValueError("stop")
         return JTJ, JTr
 
     def getBetaM(self,target_points):
@@ -314,8 +310,6 @@ class GPISOpt:
         Ty_odot = SE3.odot(PointCloud.PointXYZ2homogeneous(target_points))  # R^(N \times 4 \times 6)
         Ty_odot=np.repeat(Ty_odot,N_source,axis=0)
         #Ty_odot=np.tile(Ty_odot,(N_source,1,1))
-        #print("Ty_odot: ",Ty_odot.shape)
-        #print("self.gpisModel.Kernel.gradient(self.gpisModel.X_source, target_points): ",self.gpisModel.Kernel.gradient(self.gpisModel.X_source, target_points).shape)
         dk_dr = self._gpisModel.Kernel.gradient(self._gpisModel.X_source, target_points).T.reshape(-1,1)
         dr_dy=self.getNormDerivative(self._gpisModel.X_source,target_points)
         dk_dy=PointCloud.PointXYZ2homogeneous(dk_dr*dr_dy).reshape(N*N_source,1,4)
