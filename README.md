@@ -5,7 +5,7 @@
 
 GPISPR is a Gaussian Process implicit surface based point registration, which utilizes the concept of manifold. Its based on our IROS2020 [[paper]](https://mediatum.ub.tum.de/doc/1555279/cr7t1w2a65qkekhn3em4lm75c.gpis-gr.pdf)
 more details please refers to our paper
-![Structure](images/Standfor_Bunny.svg) 
+![Structure](images/Standfor_Bunny.png) 
 
 ### Usage
 #### 1) Prerequisite
