@@ -34,6 +34,7 @@ def gpisOptDemo():
     else:
         transform_target2source, source_down_fpfh, target_down_fpfh=opt.init(source_surface,target_surface)
 
+
     print("====> Set Up GPIS model")
     gpisData=GPISData(surface_points=source_down_fpfh,num_in_out_lier=gpisPrOptions.num_in_out_lier,has_in_lier=False)
     gpisData()

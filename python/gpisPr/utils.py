@@ -68,6 +68,7 @@ def find_correspondences(feats0, feats1, mutual_filter=True):
     mutual_filter = (corres10_idx0[corres01_idx1] == corres01_idx0)
     corres_idx0 = corres01_idx0[mutual_filter]
     corres_idx1 = corres01_idx1[mutual_filter]
+    print("multi_filter: ",mutual_filter)
 
     return corres_idx0, corres_idx1
 
@@ -129,6 +130,8 @@ def get_PCA_eigen_vector(pointXYZ):
     #print("singular_values: ",pca.singular_values_)
     return pca_eigen_vector
 
+def full_connected_graph(pointXYZ):
+    pass
 
 if __name__ == "__main__":
     x, y = np.mgrid[0:5, 2:8]
