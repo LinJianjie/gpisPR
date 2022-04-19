@@ -18,9 +18,16 @@ class Graph:
 
 if __name__=="__main__":
     #G = nx.Graph()
-    G=nx.complete_graph(5)
-    print(G.nodes)
-    print(G.edges)
-    G.add_weighted_edges_from([(1, 2, 0.5), (1, 2, 0.75), (2, 3, 0.5)])
-    print(G.edges.data())
-    print(G.edges(0))     
+    import numpy as np
+    G1=nx.complete_graph(5)
+    for i in np.arange(1,6):
+        for j in np.arange(i,6):
+            G1.add_edge(i, j, weight=np.random.random())
+    print(G1)
+    G2=nx.complete_graph(5)
+    for i in np.arange(1,6):
+        for j in np.arange(i,6):
+            G2.add_edge(i, j, weight=np.random.random())
+    GM = nx.algorithms.isomorphism.GraphMatcher(G1,G2)
+    for index,subgraph in enumerate(GM.subgraph_isomorphisms_iter()):
+            print(index,subgraph)

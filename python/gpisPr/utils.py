@@ -56,22 +56,26 @@ def find_correspondences(feats0, feats1, mutual_filter=True):
     start=time.time()
     nns0_to_1 = find_knn(feats0, feats1, knn=1, return_distance=False) # index of feats1 for each feats0
     corres01_idx0 = np.arange(len(nns0_to_1)) # The length of feats 0
-    corres01_idx1 = nns0_to_1 # index of feats 1
+    corres01_idx1 = nns0_to_1 # index of feats 1 for each feats0
 
     if not mutual_filter:
         return corres01_idx0, corres01_idx1
 
     nns1_to_0 = find_knn(feats1, feats0, knn=1, return_distance=False) # index of feats0 for each feats1
-    corres10_idx1 = np.arange(len(nns1_to_0))
-    corres10_idx0 = nns1_to_0
+    corres10_idx1 = np.arange(len(nns1_to_0)) # the length of feats 1
+    corres10_idx0 = nns1_to_0 # index of feats 0 for each feats 1
 
     mutual_filter = (corres10_idx0[corres01_idx1] == corres01_idx0)
     corres_idx0 = corres01_idx0[mutual_filter]
     corres_idx1 = corres01_idx1[mutual_filter]
-    print("multi_filter: ",mutual_filter)
-
+    
     return corres_idx0, corres_idx1
-
+def relative_position(x):
+    rel_pose=[]
+    print(x.shape[0])
+    for i in range(x.shape[0]):
+        rel_pose.append(x[i,:]-x[i+1:,:])
+    return np.vstack(np.asarray(rel_pose,dtype="object"))
 
 class Transformation:
     def __init__(self) -> None:
@@ -102,6 +106,7 @@ class Transformation:
     @Transform.setter
     def Transform(self, v):
         self._T = v
+
 
 
 def getRightHandCoordinate(v1, v2, v3):

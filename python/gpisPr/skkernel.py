@@ -98,6 +98,7 @@ class SKWilliamsMinusKernel(Kernel):
             dist1 = 2*tmp1*d1-3*self.R * tmp1+np.power(self.R, 3)
             K = dist1
         if eval_gradient:
+            
             d1 = cdist(X, Y,metric='euclidean')
             K_gradient=6*(d1-self.R)
             return K, K_gradient

@@ -58,4 +58,28 @@ class Registration:
     @staticmethod
     def execute_registration_gpis():
         pass
-    
+    @staticmethod
+    def animation_registration_results(source,target,Transformation_list):
+        source_temp = o3d.geometry.PointCloud()
+        target_temp= o3d.geometry.PointCloud()
+        source_temp=source.pcd
+        target_temp=target.pcd
+        source_temp.paint_uniform_color([1, 0.706, 0])
+        target_temp.paint_uniform_color([0, 0.651, 0.929])
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(width=1000, height=1000)
+        
+        vis.add_geometry(source_temp)
+        vis.add_geometry(target_temp)
+        vis.update_geometry(target_temp)
+        vis.poll_events()
+        vis.update_renderer()
+        time.sleep(0.5)
+        for i,update_T in enumerate(Transformation_list):
+            target_temp.transform(update_T)
+            vis.update_geometry(target_temp)
+            vis.poll_events()
+            vis.update_renderer()
+            time.sleep(0.05)
+        vis.run()
+        #vis.destroy_window()

@@ -35,11 +35,18 @@ import time
 from gpisPr.registration import Registration
 
 class GPISPrOptions:
-    def __init__(self,gpis_alpha=0, voxel_size=0.0001,num_in_out_lier=50,use_init4=False) -> None:
+    def __init__(self,gpis_alpha=0, voxel_size=0.0001,num_in_out_lier=50,use_init4=False,use_batch=True,has_in_lier=False,use_pca_init=True,LM_factor=0.01) -> None:
         self.gpis_alpha_=gpis_alpha
         self.voxel_size_=voxel_size
         self.num_in_out_lier_=num_in_out_lier
         self.use_init4_=use_init4
+        self.use_batch_=use_batch
+        self.has_in_lier_=has_in_lier
+        self.use_pca_init_=use_pca_init
+        self.LM_factor_=LM_factor
+    @property
+    def LM_factor(self):
+        return self.LM_factor_
     @property
     def gpis_alpha(self):
         return self.gpis_alpha_
@@ -52,6 +59,15 @@ class GPISPrOptions:
     @property
     def use_init4(self):
         return self.use_init4_
+    @property
+    def use_batch(self):
+        return self.use_batch_
+    @property
+    def has_in_lier(self):
+        return self.has_in_lier_
+    @property
+    def use_pca_init(self):
+        return self.use_pca_init_
 class GPISData:
     def __init__(self,surface_points,num_in_out_lier=1000,has_in_lier=False) -> None:
         self._surface_points=copy.deepcopy(surface_points)
@@ -76,7 +92,6 @@ class GPISData:
         self.create_outlier()
         self._X_source=np.vstack([self._surface_points_down.point,self.lier])
         surface_value= np.zeros(self._surface_points_down.size)
-        print("surface_value: ",surface_value.shape)
         self._Y_source=np.concatenate([surface_value,self.lier_value])
         self.compute_max_radius()
 
@@ -88,16 +103,19 @@ class GPISData:
         return self._Y_source
 
     def create_outlier(self):
-        self._surface_points_down.estimate_normal(self.voxel_size, 30)
+        self._surface_points_down.estimate_normal(self.voxel_size, 100)
         point2sdf = Point2SDF(self._surface_points_down)
         query_points, sdf=point2sdf.sample_sdf_near_surface(number_of_points=self.num_out_lier)
-        self.out_lier=query_points[sdf>0,:]
+        min_pos_threshold=0.1
+        max_pos_threshold=0.5
+        neg_threshold=-0
+        self.out_lier=query_points[sdf>min_pos_threshold,:]
         self.out_lier_PC.point=self.out_lier
-        self.out_lier_value=sdf[sdf>0]
+        self.out_lier_value=sdf[sdf>min_pos_threshold]
         if self.has_in_lier:
-            self.in_lier=query_points[sdf<-0,:]
+            self.in_lier=query_points[sdf<neg_threshold,:]
             self.in_lier_PC.point=self.in_lier
-            self.in_lier_value=sdf[sdf<-0]
+            self.in_lier_value=sdf[sdf<neg_threshold]
         if self.in_lier is not None:
             self.lier=np.vstack([self.out_lier,self.in_lier])
             self.lier_value=np.concatenate([self.out_lier_value,self.in_lier_value])
@@ -180,14 +198,16 @@ class GPISModel(GaussianProcessRegressor):
         self._X_target = v
 
 class GPISOpt:
-    def __init__(self,voxel_size=0.0001):
+    def __init__(self,voxel_size=0.0001,use_batch=False,LM_factor=0.01):
         self._gpisModel = None
         self.voxel_size = voxel_size
         self.T_last = Transformation()
         self.obj_value=10000
         self.obj_opt_min_=0
-        self.l=0.01
-        self.max_iteration=30
+        self.l=LM_factor
+        self.max_iteration=100
+        self.use_batch_=use_batch
+        self.update_gpis_Transormation=[]
     @property
     def gpisModel(self):
         return self._gpisModel
@@ -205,64 +225,84 @@ class GPISOpt:
     def check_objective_improvement(self, target_points_updated):
         new_objective=self.objective(target_points=target_points_updated)
         return new_objective<self.obj_last
-        
-    def init(self, source: PointCloud = None, target: PointCloud = None):
+    def preprocess_point_cloud(self, source: PointCloud = None, target: PointCloud = None):
         source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True,kdhyper=True)
         target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True,kdhyper=True)
+        corres_idx0, corres_idx1 = find_correspondences(source_fpfh, target_fpfh)
+
+        source_down_fpfh_ = source_down[corres_idx0, :]
+        target_down_fpfh_ = target_down[corres_idx1, :]
         source_down_fpfh=PointCloud()
         target_down_fpfh=PointCloud()
-        transform_es,source_down_fpfh_,target_down_fpfh_ = self.execute_registration_fpfh_pca_init(source_down, source_fpfh, target_down, target_fpfh)
         source_down_fpfh.point=source_down_fpfh_
         target_down_fpfh.point=target_down_fpfh_
+        return source_down_fpfh,target_down_fpfh
+    def pca_init(self, source_down: PointCloud = None, target_down: PointCloud = None):
+        transform_es = self.execute_registration_pca_init(source_down.point, target_down.point)
         transform_target2source_list=[]
         transform_target2source=Transformation()
         transform_target2source.Transform=np.linalg.inv(transform_es.Transform)
         transform_target2source_list.append(transform_target2source)
-        return transform_target2source_list,source_down_fpfh,target_down_fpfh
-    def init4(self, source: PointCloud = None, target: PointCloud = None):
-        source_down, source_fpfh = source.preprocess_point_cloud(self.voxel_size, toNumpy=True)
-        target_down, target_fpfh = target.preprocess_point_cloud(self.voxel_size, toNumpy=True)
-        source_down_fpfh=PointCloud()
-        target_down_fpfh=PointCloud()
-        transform_es,source_down_fpfh_,target_down_fpfh_ = self.execute_registration_fpfh_pca_4init(source_down, source_fpfh, target_down, target_fpfh)
-        source_down_fpfh.point=source_down_fpfh_
-        target_down_fpfh.point=target_down_fpfh_
+        return transform_target2source_list
+    def pca_init4(self, source_down: PointCloud = None, target_down: PointCloud = None):
+        transform_es = self.execute_registration_pca_4init(source_down.point, target_down.point)
         transform_target2source_list=[]
         for i in range(4):
             transform_target2source=Transformation()
             transform_target2source.Transform=np.linalg.inv(transform_es[i].Transform)
             transform_target2source_list.append(transform_target2source)
-        return transform_target2source_list,source_down_fpfh,target_down_fpfh
+        return transform_target2source_list
         
     def execute_gpis_point_registration(self, target_points, T_last: Transformation = None):
         print("T_last:\n ",T_last.Transform)
         T_check=copy.deepcopy(T_last)
+        T_epsilon_update=Transformation()
         J_last=1000
+        J_list=[J_last]
+        se3_epsilon_list=[]
+        target_points_update = self.updateTarget_Point(target_points, T_check)
+        target_points_update_last=target_points_update
+        self.update_gpis_Transormation.append(T_check.Transform)
+        point_dist=1000
         for i in tqdm.tqdm(range(self.max_iteration)):
-            target_points_update = self.updateTarget_Point(target_points, T_check)
-            if (i % 1)==0:
-                J=np.mean(np.abs(self._gpisModel.prediction(target_points_update)))
-                print("update J: ",J," J_last: ",J_last," opt: ",self.obj_opt_min_)
-                if np.abs(J-J_last)<0.0000001:
-                    print("J-J_last can not improve")
-                    return target_points_update, T_check.Transform
-                else:
-                    J_last=J
-                if (np.abs(J-self.obj_opt_min)<=0.00005 or J<self.obj_opt_min_ ):
-                    print("arrive to the opt")
-                    return target_points_update, T_check.Transform
-            start = time.time()
-            se3_epsilon = self.updateGaussNewtonBasedPerturabation(target_points=target_points_update,l=self.l)
-            #print("-->compute se3_epsilon: ",time.time()-start)
-            start = time.time()
-            T_update = self.update_transformation(se3_epsilon, T_check)
-            #print("-->compute T_update: ",time.time()-start)
-            T_check.Transform=T_update 
+            se3_epsilon = self.updateGaussNewtonBasedPerturabation(target_points=target_points_update,l=self.l)     
+            if i>0:
+                beta=0.9
+                se3_epsilon_moment=se3_epsilon_list[-1]*beta+(1-beta)*se3_epsilon
+            else:
+                se3_epsilon_moment=se3_epsilon
+            se3_epsilon_list.append(se3_epsilon)
+            T_update,T_epsilon = self.update_transformation(se3_epsilon_moment, T_check)
+           
+            T_check.Transform=T_update
+            T_epsilon_update.Transform=T_epsilon
+            target_points_update = self.updateTarget_Point(target_points_update_last, T_epsilon_update)
+            point_dist=np.mean(np.linalg.norm(target_points_update_last-target_points_update,axis=1))
+            target_points_update_last=target_points_update
+            self.update_gpis_Transormation.append(T_epsilon)
+            
+            #if point_dist<0.001:
+            J=np.mean(np.abs(self._gpisModel.prediction(target_points_update)))
+            print("J: ",J)
+            if J<np.min(np.asarray(J_list)):
+                J_list.append(J)
+            
+            if (np.abs(J-self.obj_opt_min)<=0.00005 or J<self.obj_opt_min_ ):
+                print("arrive to the opt",J," opt: ",self.obj_opt_min_)
+                return target_points_update, T_check.Transform
+        
+            if np.abs(J-J_last)<0.000001:
+                print("J-J_last can not improve: ",J," opt: ",self.obj_opt_min_)
+                return target_points_update, T_check.Transform
+            
+            J_last=J
+                    
             
         return target_points_update, T_update 
     def update_transformation(self, se3_epsilon, T_last: Transformation):
         se3_epsilon=se3_epsilon.reshape(-1)
-        return np.matmul(SE3.exp(se3_epsilon).as_matrix(), T_last.Transform)
+        T_epsilon=SE3.exp(se3_epsilon).as_matrix()
+        return np.matmul(T_epsilon, T_last.Transform),T_epsilon
 
     def updateTarget_Point(self, target_points: np.ndarray = None, transform: Transformation = None):
         if target_points.shape[1] == 4:
@@ -281,9 +321,16 @@ class GPISOpt:
         se3_epsilon =-1*cho_solve((c, low), JTr)
         return se3_epsilon
     def calculateTransformationPerturbation(self,target_points):
-        N,_=target_points.shape
-        BetaM = self.getBetaM(target_points)
-        DeltaM = self.getDeltaM(target_points).reshape(N,-1,6)
+        N_1,_=target_points.shape
+        if self.use_batch_:
+        # choose pairtial point cloud
+            choose_index=np.sort(np.random.choice(N_1, int(N_1*0.5), replace=False))
+            choose_target=target_points[choose_index,:]
+        else:
+            choose_target=target_points
+        N,_=choose_target.shape
+        BetaM = self.getBetaM(choose_target)
+        DeltaM = self.getDeltaM(choose_target).reshape(N,-1,6)
         Alpha=self._gpisModel.Alpha.reshape(-1,1)
         #betaalpha = np.sum(BetaM@Alpha,axis=0).reshape(-1,1)
         betaalpha=BetaM@Alpha
@@ -311,7 +358,9 @@ class GPISOpt:
     def getDeltaM(self,target_points):
         N,_=target_points.shape
         N_source,_=self._gpisModel.X_source.shape
-        Ty_odot = SE3.odot(PointCloud.PointXYZ2homogeneous(target_points))  # R^(N \times 4 \times 6)
+        Ty=PointCloud.PointXYZ2homogeneous(target_points)
+        Ty_odot = SE3.odot(Ty)  # R^(N \times 4 \times 6)
+        
         Ty_odot=np.repeat(Ty_odot,N_source,axis=0)
         #Ty_odot=np.tile(Ty_odot,(N_source,1,1))
         dk_dr = self._gpisModel.Kernel.gradient(self._gpisModel.X_source, target_points).T.reshape(-1,1)
@@ -319,19 +368,15 @@ class GPISOpt:
         dk_dy=PointCloud.PointXYZ2homogeneous(dk_dr*dr_dy).reshape(N*N_source,1,4)
         deltaM=dk_dy@Ty_odot
         return deltaM
-    def execute_registration_fpfh_pca_4init(self,source_down,source_fpfh,target_down, target_fpfh):
-        corres_idx0, corres_idx1 = find_correspondences(source_fpfh, target_fpfh)
-        
-        source_down_fpfh = source_down[corres_idx0, :]
-        target_down_fpfh = target_down[corres_idx1, :]
-        source_pca_vectors=get_PCA_eigen_vector(source_down_fpfh)
+    def execute_registration_pca_4init(self,source_down,target_down):
+        source_pca_vectors=get_PCA_eigen_vector(source_down)
         R_source=getAllRightHandCoordinate(source_pca_vectors)
-        target_pca_vectors=get_PCA_eigen_vector(target_down_fpfh)
+        target_pca_vectors=get_PCA_eigen_vector(target_down)
         R_target=getRightHandCoordinate(target_pca_vectors[:,0],target_pca_vectors[:,1],target_pca_vectors[:,2])
         R_es=[np.matmul(R_target,R.T) for R in R_source]
 
-        source_down_fpfh_center=PointCloud.PointCenter(source_down_fpfh)
-        target_down_fpfh_center=PointCloud.PointCenter(target_down_fpfh)
+        source_down_fpfh_center=PointCloud.PointCenter(source_down)
+        target_down_fpfh_center=PointCloud.PointCenter(target_down)
         trans=[target_down_fpfh_center-np.matmul(R_es_i,source_down_fpfh_center) for R_es_i in R_es]
         trans_es_list=[]
         for i in range(4):
@@ -339,30 +384,24 @@ class GPISOpt:
             transform_es.rotation=R_es[i]
             transform_es.trans=trans[i]
             trans_es_list.append(transform_es)
-        return trans_es_list,source_down_fpfh,target_down_fpfh
+        return trans_es_list
 
-    def execute_registration_fpfh_pca_init(self,source_down,source_fpfh,target_down, target_fpfh):
-        corres_idx0, corres_idx1 = find_correspondences(source_fpfh, target_fpfh)
-        source_down_fpfh = source_down[corres_idx0, :]
-        target_down_fpfh = target_down[corres_idx1, :]
-        print("corresponding source points: ",source_down_fpfh.shape)
-        print("corresponding target points: ",source_down_fpfh.shape)
-        source_pca_vectors=get_PCA_eigen_vector(source_down_fpfh)
+    def execute_registration_pca_init(self,source_down,target_down):
+        source_pca_vectors=get_PCA_eigen_vector(source_down)
         R_source=getRightHandCoordinate(source_pca_vectors[:,0],source_pca_vectors[:,1],source_pca_vectors[:,2])
-
-        target_pca_vectors=get_PCA_eigen_vector(target_down_fpfh)
+        target_pca_vectors=get_PCA_eigen_vector(target_down)
         R_target=getRightHandCoordinate(target_pca_vectors[:,0],target_pca_vectors[:,1],target_pca_vectors[:,2])
 
         R_es=np.matmul(R_target,R_source.T)
 
-        source_down_fpfh_center=PointCloud.PointCenter(source_down_fpfh)
-        target_down_fpfh_center=PointCloud.PointCenter(target_down_fpfh)
+        source_down_fpfh_center=PointCloud.PointCenter(source_down)
+        target_down_fpfh_center=PointCloud.PointCenter(target_down)
         trans=target_down_fpfh_center-np.matmul(R_es,source_down_fpfh_center)
 
         transform_es=Transformation()
         transform_es.rotation=R_es
         transform_es.trans=trans
-        return transform_es,source_down_fpfh,target_down_fpfh
+        return transform_es
 
 
 if __name__ == '__main__':

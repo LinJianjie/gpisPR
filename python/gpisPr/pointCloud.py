@@ -198,17 +198,18 @@ class PointCloud:
                 #raise ValueError("stop")
             else:
                 voxel_size=0.0001 # TODO how to get the propery voxel
-        print("size of down: ",self.size_down)
         pcd_down=self.pcd_down
         if kdhyper:
-            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size*50,max_nn=30))
+            radius=voxel_size*1000
+            max_knn=200
+            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius,max_nn=max_knn))
             pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_down,
-                                                                    o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size*50,max_nn=30))
-            print(" finished")                                                   
+                                                                    o3d.geometry.KDTreeSearchParamHybrid(radius=radius,max_nn=max_knn))
+                                                               
         else:
-            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(knn=50))
+            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(knn=100))
             pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_down,
-                                                                    o3d.geometry.KDTreeSearchParamKNN(knn=50))
+                                                                    o3d.geometry.KDTreeSearchParamKNN(knn=100))
         if toNumpy:
             return PointCloud.pca2xyz(pcd_down), np.array(pcd_fpfh.data).T
         else:
@@ -254,6 +255,12 @@ class PointCloud:
     @staticmethod
     def Homogeneous2PointXYZ(home_points):
         return home_points[:,:3]
+    def add_Gaussian_noise(self,noise):
+        noise_=np.random.normal(0,noise,size=(self.size,3))
+        self.point=self.point+noise_
+    def add_uniform_noise(self,noise):
+        noise_=np.random.uniform(-noise,noise,size=(self.size,3))
+        self.point=self.point+noise_
 if __name__ == '__main__':
     source = PointCloud(filename="../data/bunny_1420.pcd")
     source()
