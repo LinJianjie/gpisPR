@@ -267,7 +267,7 @@ class GPISOpt:
         for i in tqdm.tqdm(range(self.max_iteration)):
             se3_epsilon = self.updateGaussNewtonBasedPerturabation(target_points=target_points_update,l=self.l)     
             if i>0:
-                beta=0.9
+                beta=0.5
                 se3_epsilon_moment=se3_epsilon_list[-1]*beta+(1-beta)*se3_epsilon
             else:
                 se3_epsilon_moment=se3_epsilon
@@ -281,21 +281,20 @@ class GPISOpt:
             target_points_update_last=target_points_update
             self.update_gpis_Transormation.append(T_epsilon)
             
-            #if point_dist<0.001:
-            J=np.mean(np.abs(self._gpisModel.prediction(target_points_update)))
-            print("J: ",J)
-            if J<np.min(np.asarray(J_list)):
-                J_list.append(J)
+            if point_dist<0.001:
+                J=np.mean(np.abs(self._gpisModel.prediction(target_points_update)))
+                if J<np.min(np.asarray(J_list)):
+                    J_list.append(J)
+                
+                if (np.abs(J-self.obj_opt_min)<=0.00005 or J<self.obj_opt_min_ ):
+                    print("arrive to the opt",J," opt: ",self.obj_opt_min_)
+                    return target_points_update, T_check.Transform
             
-            if (np.abs(J-self.obj_opt_min)<=0.00005 or J<self.obj_opt_min_ ):
-                print("arrive to the opt",J," opt: ",self.obj_opt_min_)
-                return target_points_update, T_check.Transform
-        
-            if np.abs(J-J_last)<0.000001:
-                print("J-J_last can not improve: ",J," opt: ",self.obj_opt_min_)
-                return target_points_update, T_check.Transform
-            
-            J_last=J
+                if np.abs(J-J_last)<0.000001:
+                    print("J-J_last can not improve: ",J," opt: ",self.obj_opt_min_)
+                    return target_points_update, T_check.Transform
+                
+                J_last=J
                     
             
         return target_points_update, T_update 

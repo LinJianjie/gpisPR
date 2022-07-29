@@ -59,7 +59,7 @@ class PointCloud:
         self._pcd.translate(self._pcd.get_center()*-1)
     def scale(self,scale_):
         self.centralized()
-        self._pcd.scale(scale_,center=self._pcd.get_center())
+        #self._pcd.scale(scale_,center=self._pcd.get_center())
     def transform(self, transinit):
         self._pcd.transform(transinit)
     def get_center(self):
@@ -200,11 +200,11 @@ class PointCloud:
                 voxel_size=0.0001 # TODO how to get the propery voxel
         pcd_down=self.pcd_down
         if kdhyper:
-            radius=voxel_size*1000
-            max_knn=200
-            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius,max_nn=max_knn))
+            radius=voxel_size*100
+            max_knn=100
+            pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius,max_nn=30))
             pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_down,
-                                                                    o3d.geometry.KDTreeSearchParamHybrid(radius=radius,max_nn=max_knn))
+                                                                    o3d.geometry.KDTreeSearchParamHybrid(radius=voxel_size*50,max_nn=max_knn))
                                                                
         else:
             pcd_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(knn=100))

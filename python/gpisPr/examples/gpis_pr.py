@@ -27,9 +27,10 @@ def gpisOptDemo():
     source_surface()
     source_surface.scale(scale_=1)
     target_surface=copy.deepcopy(source_surface)
-    #target_surface.add_Gaussian_noise(0.002)
+    target_surface.add_Gaussian_noise(0.001)
+    source_surface.add_Gaussian_noise(0.001)
     transinit = Transformation()
-    transinit.setT(trans=np.asarray([0.0, 0.00, 0.00]),rot_deg=[50,30,50])
+    transinit.setT(trans=np.asarray([0.01, 0.01, 0.0]),rot_deg=[50,0,40])
     target_surface.transform(transinit.Transform)
     vis_Init=False
     if vis_Init:
@@ -38,6 +39,7 @@ def gpisOptDemo():
     print("=====> Set Up GPIS Opt")
     gpisOpt = GPISOpt(voxel_size=gpisPrOptions.voxel_size,use_batch=gpisPrOptions.use_batch,LM_factor=gpisPrOptions.LM_factor)
     source_down_fpfh, target_down_fpfh=gpisOpt.preprocess_point_cloud(source_surface,target_surface)
+    
     if gpisPrOptions.use_pca_init:
         print("=====> Begin GPIS PCA init ")
         if gpisPrOptions.use_init4:

@@ -41,7 +41,8 @@ def test_se3():
     print(p33.shape)
     odot33 = SE3.odot(p33)
     print(odot33.shape)
-
+    se3_epsilon=[0,0,0,0,0,0]
+    print(SE3.exp(se3_epsilon).as_matrix())
 
 def test_optimization():
     gpisModel = GPISModel(kernel=SKWilliamsMinusKernel(3), random_state=0)
@@ -156,7 +157,7 @@ def test_gpisOpt():
     opt.gpisModel=gpisModel
 
     #transform_target2source=opt.init(source_surface,target_surface)
-    transform_target2source,_,_=opt.init4(source_surface,target_surface)
+    transform_target2source,_,_=opt.pca_init4(source_surface,target_surface)
     #print("transform_target2source:\n ",transform_target2source.Transform)
     init_target_value=[]
     for i in range(4):
@@ -222,7 +223,7 @@ def gpisOptDemo():
     print("=====> Set Up GPIS Opt")
     opt = GPISOpt()
     print("=====> Begin GPIS PCA init ")
-    transform_target2source, source_down_fpfh, target_down_fpfh=opt.init(source_surface,target_surface)
+    transform_target2source, source_down_fpfh, target_down_fpfh=opt.pca_init(source_surface,target_surface)
 
     print("====> Set Up GPIS model")
     gpisData=GPISData(surface_points=source_down_fpfh,num_in_out_lier=50,has_in_lier=False)
